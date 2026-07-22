@@ -427,16 +427,31 @@
                     </p>
 
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        <!-- Animation Canvas -->
+                        <!-- Animation Canvas Container -->
                         <div
-                            class="lg:col-span-7 bg-slate-900 p-6 rounded-2xl flex flex-col justify-center items-center border border-slate-800 shadow-inner relative">
-                            <span class="text-[10px] text-slate-400 font-bold block mb-2"><i
-                                    class="fa-solid fa-eye"></i> ภาพแสดงคานสมดุลและฟิล์มของเหลวเสมือนจริง</span>
-                            <canvas id="tensionCanvas" width="340" height="224"
-                                class="bg-slate-950 border border-slate-800 rounded"></canvas>
-                            <div
-                                class="absolute top-3 left-8 text-[9px] font-mono text-slate-500 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
-                                ลูกศรแรง: แดง = แรงซ้าย (W), เหลือง = มวลห่วง (w), น้ำเงิน = แรงดึงผิว (Fs)
+                            class="lg:col-span-7 bg-slate-950 p-4 sm:p-5 rounded-2xl flex flex-col justify-between border border-slate-800 shadow-xl relative min-h-[340px] md:min-h-[420px]">
+                            <!-- Header / Legend Bar -->
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-800 pb-3 mb-2">
+                                <span class="text-xs sm:text-sm font-bold text-white tracking-wide flex items-center gap-2">
+                                    <i class="fa-solid fa-eye text-cyan-400 text-sm"></i> ภาพแสดงคานสมดุลและฟิล์มของเหลวเสมือนจริง
+                                </span>
+                                <div class="flex items-center gap-2 flex-wrap text-xs font-bold">
+                                    <span class="px-3 py-1 rounded-lg flex items-center gap-1.5 shadow-sm" style="background-color: rgba(239, 68, 68, 0.25); border: 1.5px solid #f87171; color: #fecdd3;">
+                                        <span class="w-2.5 h-2.5 rounded-full inline-block shadow-sm" style="background-color: #ef4444;"></span> แดง: แรงซ้าย (W)
+                                    </span>
+                                    <span class="px-3 py-1 rounded-lg flex items-center gap-1.5 shadow-sm" style="background-color: rgba(245, 158, 11, 0.25); border: 1.5px solid #fbbf24; color: #fef08a;">
+                                        <span class="w-2.5 h-2.5 rounded-full inline-block shadow-sm" style="background-color: #f59e0b;"></span> เหลือง: มวลห่วง (w)
+                                    </span>
+                                    <span class="px-3 py-1 rounded-lg flex items-center gap-1.5 shadow-sm" style="background-color: rgba(6, 182, 212, 0.25); border: 1.5px solid #38bdf8; color: #bae6fd;">
+                                        <span class="w-2.5 h-2.5 rounded-full inline-block shadow-sm" style="background-color: #38bdf8;"></span> ฟ้า: แรงตึงผิว (Fs)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Canvas Area -->
+                            <div class="flex-grow w-full relative flex items-center justify-center min-h-[280px]">
+                                <canvas id="tensionCanvas"
+                                    class="w-full h-full rounded-xl bg-slate-950 block"></canvas>
                             </div>
                         </div>
 
@@ -615,20 +630,36 @@
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         <!-- Animation Canvas & Graph Box -->
                         <div
-                            class="lg:col-span-7 bg-slate-900 p-6 rounded-2xl grid grid-cols-12 gap-4 border border-slate-800 shadow-inner">
-                            <div class="col-span-4 flex flex-col items-center border-r border-slate-800 pr-2">
-                                <span class="text-[10px] text-slate-400 font-bold block mb-2"><i
-                                        class="fa-solid fa-flask"></i> หลอดทดสอบ</span>
-                                <canvas id="viscosityCanvas" width="110" height="210"
-                                    class="bg-slate-950 border border-slate-800 rounded"></canvas>
+                            class="lg:col-span-7 bg-slate-950 p-4 sm:p-5 rounded-2xl flex flex-col justify-between border border-slate-800 shadow-xl min-h-[340px] md:min-h-[420px]">
+                            <!-- Header / Legend Bar -->
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-800 pb-3 mb-2">
+                                <span class="text-xs sm:text-sm font-bold text-white tracking-wide flex items-center gap-2">
+                                    <i class="fa-solid fa-vial text-cyan-400 text-sm"></i> การตกของทรงกลมภายใต้แรงหนืด (Stokes' Law)
+                                </span>
+                                <div class="flex items-center gap-1.5 flex-wrap text-xs font-bold">
+                                    <span class="px-2.5 py-0.5 rounded-lg flex items-center gap-1 shadow-sm" style="background-color: rgba(239, 68, 68, 0.25); border: 1.5px solid #f87171; color: #fecdd3;">
+                                        <span class="w-2 h-2 rounded-full inline-block shadow-sm" style="background-color: #ef4444;"></span> แดง: W
+                                    </span>
+                                    <span class="px-2.5 py-0.5 rounded-lg flex items-center gap-1 shadow-sm" style="background-color: rgba(16, 185, 129, 0.25); border: 1.5px solid #34d399; color: #a7f3d0;">
+                                        <span class="w-2 h-2 rounded-full inline-block shadow-sm" style="background-color: #10b981;"></span> เขียว: B
+                                    </span>
+                                    <span class="px-2.5 py-0.5 rounded-lg flex items-center gap-1 shadow-sm" style="background-color: rgba(6, 182, 212, 0.25); border: 1.5px solid #38bdf8; color: #bae6fd;">
+                                        <span class="w-2 h-2 rounded-full inline-block shadow-sm" style="background-color: #38bdf8;"></span> ฟ้า: Fv
+                                    </span>
+                                </div>
                             </div>
-                            <div class="col-span-8 flex flex-col justify-between pl-1">
-                                <span class="text-[10px] text-slate-400 font-bold block mb-2"><i
-                                        class="fa-solid fa-chart-line"></i> กราฟอัตราเร็ว - เวลา (v-t Graph)</span>
-                                <canvas id="viscosityGraphCanvas" width="220" height="180"
-                                    class="bg-slate-950 border border-slate-800 rounded"></canvas>
-                                <div class="text-[9px] text-slate-400 text-right mt-1">เส้นปะคือค่าจำกัดความเร็วปลายปลาย
-                                    \( v_t \)</div>
+
+                            <!-- Canvas Area (Tube + Graph) -->
+                            <div class="flex-grow w-full grid grid-cols-12 gap-3 min-h-[280px]">
+                                <div class="col-span-4 flex flex-col items-center border-r border-slate-800/80 pr-2">
+                                    <span class="text-[11px] text-slate-300 font-bold block mb-1.5"><i class="fa-solid fa-vial text-cyan-400"></i> หลอดทดสอบ</span>
+                                    <canvas id="viscosityCanvas" class="w-full h-full bg-slate-950 rounded-xl block"></canvas>
+                                </div>
+                                <div class="col-span-8 flex flex-col justify-between pl-1">
+                                    <span class="text-[11px] text-slate-300 font-bold block mb-1.5"><i class="fa-solid fa-chart-line text-cyan-400"></i> กราฟอัตราเร็ว - เวลา (\(v-t\))</span>
+                                    <canvas id="viscosityGraphCanvas" class="w-full h-full bg-slate-950 rounded-xl block"></canvas>
+                                    <div class="text-[10px] text-slate-400 text-right mt-1 font-mono">เส้นประคือความเร็วปลายวิกฤต (\(v_t\))</div>
+                                </div>
                             </div>
                         </div>
 
@@ -714,14 +745,26 @@
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         <!-- Canvas Box (Visual Lab) -->
                         <div
-                            class="lg:col-span-6 bg-slate-900 p-6 rounded-2xl flex flex-col justify-center items-center border border-slate-800 shadow-inner relative">
-                            <span class="text-[10px] text-slate-400 font-bold block mb-2"><i
-                                    class="fa-solid fa-eye"></i> ภาพแสดงถังน้ำล้นเสมือนจริง</span>
-                            <canvas id="buoyancyCanvas" width="340" height="224"
-                                class="bg-slate-950 border border-slate-800 rounded"></canvas>
-                            <div
-                                class="absolute top-3 left-8 text-[9px] font-mono text-slate-500 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
-                                ลูกศรแรง: เขียว = แรงพยุง (B), แดง = น้ำหนักวัตถุ (W)
+                            class="lg:col-span-6 bg-slate-950 p-4 sm:p-5 rounded-2xl flex flex-col justify-between border border-slate-800 shadow-xl relative min-h-[340px] md:min-h-[420px]">
+                            <!-- Header / Legend Bar -->
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-800 pb-3 mb-2">
+                                <span class="text-xs sm:text-sm font-bold text-white tracking-wide flex items-center gap-2">
+                                    <i class="fa-solid fa-eye text-cyan-400 text-sm"></i> ภาพแสดงถังน้ำล้นเสมือนจริง
+                                </span>
+                                <div class="flex items-center gap-2 flex-wrap text-xs font-bold">
+                                    <span class="px-3 py-1 rounded-lg flex items-center gap-1.5 shadow-sm" style="background-color: rgba(16, 185, 129, 0.25); border: 1.5px solid #34d399; color: #a7f3d0;">
+                                        <span class="w-2.5 h-2.5 rounded-full inline-block shadow-sm" style="background-color: #10b981;"></span> เขียว: แรงพยุง (B)
+                                    </span>
+                                    <span class="px-3 py-1 rounded-lg flex items-center gap-1.5 shadow-sm" style="background-color: rgba(239, 68, 68, 0.25); border: 1.5px solid #f87171; color: #fecdd3;">
+                                        <span class="w-2.5 h-2.5 rounded-full inline-block shadow-sm" style="background-color: #ef4444;"></span> แดง: น้ำหนักวัตถุ (W)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Canvas Area -->
+                            <div class="flex-grow w-full relative flex items-center justify-center min-h-[280px]">
+                                <canvas id="buoyancyCanvas"
+                                    class="w-full h-full rounded-xl bg-slate-950 block"></canvas>
                             </div>
                         </div>
 

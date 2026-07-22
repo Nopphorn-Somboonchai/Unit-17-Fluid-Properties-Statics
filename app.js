@@ -260,9 +260,15 @@ function showSection(sectionId) {
     // Initializations for simulators
     stopSimulations();
     if (norm === 'review') {
-        const activeTab = document.getElementById('btn-tab-17-2-viscosity').classList.contains('bg-white') ? '17-2-viscosity' : '17-3-buoyancy';
-        if (activeTab === '17-2-viscosity') initViscositySim();
-        if (activeTab === '17-3-buoyancy') initBuoyancySim();
+        const btnT = document.getElementById('btn-tab-17-2-tension');
+        const btnV = document.getElementById('btn-tab-17-2-viscosity');
+        const activeTab = (btnT && btnT.classList.contains('bg-white'))
+            ? '17-2-tension'
+            : ((btnV && btnV.classList.contains('bg-white')) ? '17-2-viscosity' : '17-3-buoyancy');
+
+        if (activeTab === '17-2-tension') initTensionSim();
+        else if (activeTab === '17-2-viscosity') initViscositySim();
+        else initBuoyancySim();
     }
 
     renderMath();
@@ -726,31 +732,42 @@ function renderBuoyancyLoop() {
     const canvas = document.getElementById('buoyancyCanvas');
     if (!canvas) return;
 
+    // Auto-fit canvas dimensions to parent container
+    if (canvas.parentElement) {
+        const parentW = canvas.parentElement.clientWidth;
+        const parentH = canvas.parentElement.clientHeight;
+        if (parentW > 0 && Math.abs(canvas.width - parentW) > 2) {
+            canvas.width = parentW;
+        }
+        if (parentH > 0 && Math.abs(canvas.height - parentH) > 2) {
+            canvas.height = parentH;
+        }
+    }
+
     const ctx = canvas.getContext('2d');
-    const cw = canvas.width;
-    const ch = canvas.height;
+    const cw = canvas.width || 340;
+    const ch = canvas.height || 280;
 
     ctx.clearRect(0, 0, cw, ch);
 
-    // Beaker coordinates
-    const beakerX = 40;
-    const beakerY = 50;
-    const beakerW = 160;
-    const beakerH = 140;
+    // Dynamic Beaker & Overflow Jar coordinates
+    const beakerW = Math.min(170, cw * 0.44);
+    const beakerH = Math.min(150, ch * 0.55);
+    const beakerX = Math.max(15, cw * 0.08);
+    const beakerY = Math.max(30, ch * 0.18);
     const spoutY = beakerY + 30;
 
-    // Overflow jar
-    const jarX = beakerX + beakerW + 40;
-    const jarY = beakerY + 60;
-    const jarW = 60;
-    const jarH = beakerH - 60;
+    const jarW = Math.min(65, cw * 0.18);
+    const jarH = beakerH - 40;
+    const jarX = Math.min(cw - jarW - 15, beakerX + beakerW + Math.max(20, cw * 0.08));
+    const jarY = beakerY + 40;
 
     const gConst = 9.8;
     const blockMass = (bParams.blockDensity * bParams.blockVolume) / 1000;
     const gravityForce = blockMass * gConst;
 
-    let blockW = 40 + bParams.blockVolume * 6;
-    let blockH = 40 + bParams.blockVolume * 6;
+    let blockW = Math.min(beakerW * 0.45, 36 + bParams.blockVolume * 5);
+    let blockH = Math.min(beakerH * 0.45, 36 + bParams.blockVolume * 5);
 
     const waterSurfaceY = spoutY;
     let visualY = 0;
@@ -814,7 +831,7 @@ function renderBuoyancyLoop() {
     const finalBuoyantForce = (bParams.fluidDensity * finalVolumeSubmerged * gConst) / 1000;
 
     // RENDER OVERFLOW JAR WATER
-    ctx.strokeStyle = '#cbd5e1';
+    ctx.strokeStyle = '#94a3b8';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(jarX, jarY);
@@ -823,45 +840,45 @@ function renderBuoyancyLoop() {
     ctx.lineTo(jarX + jarW, jarY);
     ctx.stroke();
 
-    ctx.fillStyle = '#64748b';
-    ctx.font = '7px monospace';
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '9px monospace';
     for (let mark = 1; mark <= 5; mark++) {
         const markY = jarY + jarH - (mark / 5) * (jarH - 10);
         ctx.beginPath();
         ctx.moveTo(jarX + jarW - 8, markY);
         ctx.lineTo(jarX + jarW, markY);
         ctx.stroke();
-        ctx.fillText(mark + 'L', jarX + jarW + 3, markY + 2);
+        ctx.fillText(mark + 'L', jarX + jarW + 3, markY + 3);
     }
 
     const fillHeightInJar = (finalVolumeSubmerged / 5.0) * (jarH - 10);
     if (fillHeightInJar > 0) {
         ctx.fillStyle = bParams.fluidDensity === 1000 
-            ? 'rgba(6, 182, 212, 0.35)' 
+            ? 'rgba(6, 182, 212, 0.45)' 
             : bParams.fluidDensity === 800 
-                ? 'rgba(249, 115, 22, 0.25)' 
-                : 'rgba(245, 158, 11, 0.35)';
+                ? 'rgba(249, 115, 22, 0.35)' 
+                : 'rgba(245, 158, 11, 0.45)';
         ctx.fillRect(jarX + 1.5, jarY + jarH - fillHeightInJar, jarW - 3, fillHeightInJar);
 
-        ctx.fillStyle = '#334155';
-        ctx.font = '7px Sarabun';
-        ctx.fillText('ล้น: ' + finalVolumeSubmerged.toFixed(1) + ' L', jarX + 6, jarY + jarH - fillHeightInJar - 4);
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 9px Prompt';
+        ctx.fillText('ล้น: ' + finalVolumeSubmerged.toFixed(1) + ' L', jarX + 4, jarY + jarH - fillHeightInJar - 5);
     }
 
     // BEAKER WATER FILLING
     ctx.fillStyle = bParams.fluidDensity === 1000 
-        ? 'rgba(6, 182, 212, 0.25)' 
+        ? 'rgba(6, 182, 212, 0.30)' 
         : bParams.fluidDensity === 800 
-            ? 'rgba(249, 115, 22, 0.18)' 
-            : 'rgba(245, 158, 11, 0.25)';
+            ? 'rgba(249, 115, 22, 0.22)' 
+            : 'rgba(245, 158, 11, 0.30)';
     ctx.fillRect(beakerX + 2, waterSurfaceY, beakerW - 4, beakerY + beakerH - waterSurfaceY - 2);
 
     if (fractionSubmerged > 0.05 && bParams.blockVy !== 0) {
-        ctx.strokeStyle = bParams.fluidDensity === 1000 ? 'rgba(6, 182, 212, 0.6)' : bParams.fluidDensity === 800 ? 'rgba(249, 115, 22, 0.5)' : 'rgba(245, 158, 11, 0.6)';
+        ctx.strokeStyle = bParams.fluidDensity === 1000 ? 'rgba(6, 182, 212, 0.7)' : bParams.fluidDensity === 800 ? 'rgba(249, 115, 22, 0.6)' : 'rgba(245, 158, 11, 0.7)';
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(beakerX + beakerW - 3, spoutY + 1.5);
-        ctx.quadraticCurveTo(beakerX + beakerW + 15, spoutY - 4, jarX + 5, jarY + 8);
+        ctx.quadraticCurveTo(beakerX + beakerW + (jarX - (beakerX + beakerW)) / 2, spoutY - 4, jarX + 5, jarY + 8);
         ctx.stroke();
     }
 
@@ -873,8 +890,8 @@ function renderBuoyancyLoop() {
     ctx.lineTo(beakerX, beakerY + beakerH);
     ctx.lineTo(beakerX + beakerW, beakerY + beakerH);
     ctx.lineTo(beakerX + beakerW, spoutY + 4);
-    ctx.lineTo(beakerX + beakerW + 15, spoutY + 8);
-    ctx.lineTo(beakerX + beakerW + 15, spoutY + 11);
+    ctx.lineTo(beakerX + beakerW + 12, spoutY + 8);
+    ctx.lineTo(beakerX + beakerW + 12, spoutY + 11);
     ctx.lineTo(beakerX + beakerW, spoutY + 8);
     ctx.lineTo(beakerX + beakerW, beakerY);
     ctx.stroke();
@@ -882,7 +899,7 @@ function renderBuoyancyLoop() {
     // RENDER SOLID BLOCK
     const blockX = beakerX + beakerW / 2 - blockW / 2;
     ctx.fillStyle = '#cbd5e1';
-    ctx.strokeStyle = '#64748b';
+    ctx.strokeStyle = '#475569';
     ctx.lineWidth = 2;
     ctx.fillRect(blockX, visualY, blockW, blockH);
     ctx.strokeRect(blockX, visualY, blockW, blockH);
@@ -891,15 +908,15 @@ function renderBuoyancyLoop() {
         const subTopY = Math.max(visualY, waterSurfaceY);
         const subH = (visualY + blockH) - subTopY;
         ctx.fillStyle = bParams.fluidDensity === 1000 
-            ? 'rgba(6, 182, 212, 0.15)' 
+            ? 'rgba(6, 182, 212, 0.25)' 
             : bParams.fluidDensity === 800 
-                ? 'rgba(249, 115, 22, 0.12)' 
-                : 'rgba(245, 158, 11, 0.18)';
+                ? 'rgba(249, 115, 22, 0.20)' 
+                : 'rgba(245, 158, 11, 0.25)';
         ctx.fillRect(blockX, subTopY, blockW, subH);
     }
 
     ctx.fillStyle = '#0f172a';
-    ctx.font = '8px Sarabun';
+    ctx.font = 'bold 9px Prompt';
     ctx.textAlign = 'center';
     ctx.fillText(blockMass.toFixed(2) + ' kg', blockX + blockW / 2, visualY + blockH / 2 + 3);
 
@@ -907,12 +924,12 @@ function renderBuoyancyLoop() {
     const arrowStartY = visualY + blockH / 2;
     const scaleN = 4.0;
 
-    // Gravity vector
+    // Gravity vector (Red arrow W)
     if (gravityForce > 0.1) {
         ctx.strokeStyle = '#ef4444';
         ctx.fillStyle = '#ef4444';
         ctx.lineWidth = 2.5;
-        const arrowH = gravityForce * scaleN;
+        const arrowH = Math.min(ch - 15 - arrowStartY, gravityForce * scaleN);
         ctx.beginPath();
         ctx.moveTo(arrowStartX, arrowStartY);
         ctx.lineTo(arrowStartX, arrowStartY + arrowH);
@@ -924,17 +941,17 @@ function renderBuoyancyLoop() {
         ctx.lineTo(arrowStartX + 4, arrowStartY + arrowH - 5);
         ctx.fill();
 
-        ctx.font = 'bold 8px Sarabun';
+        ctx.font = 'bold 9px Prompt';
         ctx.textAlign = 'left';
         ctx.fillText('W = ' + gravityForce.toFixed(1) + ' N', arrowStartX + 8, arrowStartY + arrowH / 2 + 3);
     }
 
-    // Buoyancy vector
+    // Buoyancy vector (Green arrow B)
     if (finalBuoyantForce > 0.1) {
         ctx.strokeStyle = '#10b981';
         ctx.fillStyle = '#10b981';
         ctx.lineWidth = 2.5;
-        const arrowH = finalBuoyantForce * scaleN;
+        const arrowH = Math.min(arrowStartY - 10, finalBuoyantForce * scaleN);
         ctx.beginPath();
         ctx.moveTo(arrowStartX, arrowStartY);
         ctx.lineTo(arrowStartX, arrowStartY - arrowH);
@@ -946,7 +963,7 @@ function renderBuoyancyLoop() {
         ctx.lineTo(arrowStartX + 4, arrowStartY - arrowH + 5);
         ctx.fill();
 
-        ctx.font = 'bold 8px Sarabun';
+        ctx.font = 'bold 9px Prompt';
         ctx.textAlign = 'left';
         ctx.fillText('B = ' + finalBuoyantForce.toFixed(1) + ' N', arrowStartX + 8, arrowStartY - arrowH / 2 + 3);
     }
@@ -1086,6 +1103,12 @@ function updateTensionParams() {
     const L = 4 * Math.PI * r_m; // 2 sides contact
     const fmax = L * tParams.fluidTension;
     document.getElementById('val-tension-fmax').innerText = fmax.toFixed(4) + ' N';
+
+    // Ensure tension simulation loop is running if tension tab is active
+    const btnT = document.getElementById('btn-tab-17-2-tension');
+    if (currentSection === 'review' && btnT && btnT.classList.contains('bg-white') && !activeAnimFrame) {
+        activeAnimFrame = requestAnimationFrame(renderTensionLoop);
+    }
 }
 
 function adjustTensionMass(amount) {
@@ -1186,9 +1209,21 @@ function renderTensionLoop() {
         return;
     }
 
+    // Auto-fit canvas dimensions to parent container
+    if (canvas.parentElement) {
+        const parentW = canvas.parentElement.clientWidth;
+        const parentH = canvas.parentElement.clientHeight;
+        if (parentW > 0 && Math.abs(canvas.width - parentW) > 2) {
+            canvas.width = parentW;
+        }
+        if (parentH > 0 && Math.abs(canvas.height - parentH) > 2) {
+            canvas.height = parentH;
+        }
+    }
+
     const ctx = canvas.getContext('2d');
-    const w = canvas.width;
-    const h = canvas.height;
+    const w = canvas.width || 340;
+    const h = canvas.height || 280;
 
     // Apply auto modifications
     if (tParams.isAutoSlidingX && !tParams.filmRuptured) {
@@ -1281,9 +1316,20 @@ function renderTensionLoop() {
                 document.getElementById('val-tension-gammanet').innerText = gammaExp.toFixed(4) + ' N/m';
             }
         }
+    } else {
+        // Auto re-attach film when ring touches/enters liquid surface again
+        if (ringHeightDisplacement <= 0) {
+            tParams.filmRuptured = false;
+            const state = document.getElementById('lbl-tension-state');
+            if (state) {
+                state.innerText = 'พร้อมทดลอง (ห่วงสัมผัสผิว)';
+                state.className = 'text-xs px-2 py-0.5 bg-teal-100 text-teal-800 font-bold rounded';
+            }
+            Fs = 80.0 * ringHeightDisplacement;
+        }
     }
 
-    const F_right = m_kg * g + (Fs > 0 ? Fs : 0.0);
+    const F_right = Math.max(0, m_kg * g + Fs);
     const tauR = F_right * y_m * Math.cos(tParams.beamAngle);
 
     const I_rod = 0.001; 
@@ -1315,29 +1361,29 @@ function renderTensionLoop() {
     ctx.clearRect(0, 0, w, h);
 
     const cx = w / 2;
-    const cy = h / 2 - 20; 
+    const cy = h * 0.32; // Elevated pivot position to ensure space below
 
     // 1. Draw Stand
     ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 6;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.lineTo(cx, h - 30);
+    ctx.lineTo(cx, h - 20);
     ctx.stroke();
 
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(cx - 30, h - 30, 60, 8);
+    ctx.fillRect(cx - 40, h - 20, 80, 8);
 
-    // 2. Draw Beam
-    const beamHalfLen = 130;
+    // 2. Draw Beam (Dynamic scale based on width)
+    const beamHalfLen = Math.min(w * 0.38, 220);
     const xL = cx - beamHalfLen * Math.cos(tParams.beamAngle);
     const yL = cy + beamHalfLen * Math.sin(tParams.beamAngle);
     const xR = cx + beamHalfLen * Math.cos(tParams.beamAngle);
     const yR = cy - beamHalfLen * Math.sin(tParams.beamAngle);
 
-    ctx.strokeStyle = '#4d7c0f'; // Olive green
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#65a30d'; // Bright olive green
+    ctx.lineWidth = 5;
     ctx.beginPath();
     ctx.moveTo(xL, yL);
     ctx.lineTo(xR, yR);
@@ -1346,101 +1392,110 @@ function renderTensionLoop() {
     // 3. Draw Pivot Pin
     ctx.fillStyle = '#eab308';
     ctx.beginPath();
-    ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
+    ctx.arc(cx, cy, 6, 0, 2 * Math.PI);
     ctx.fill();
     ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
     
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 11px Prompt';
-    ctx.fillText('P', cx - 4, cy - 8);
+    ctx.fillText('P', cx - 4, cy - 9);
 
     // 4. Draw Left Weight Hanger
     const dx_px = (tParams.leftX / 30) * beamHalfLen;
     const hangerXL = cx - dx_px * Math.cos(tParams.beamAngle);
     const hangerYL = cy + dx_px * Math.sin(tParams.beamAngle);
 
+    const hangerLen = Math.min(42, h * 0.15);
     ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(hangerXL, hangerYL);
-    ctx.lineTo(hangerXL, hangerYL + 40);
+    ctx.lineTo(hangerXL, hangerYL + hangerLen);
     ctx.stroke();
 
-    const r_weight = 7 + Math.sqrt(tParams.leftMass) * 1.5;
+    const r_weight = 7 + Math.sqrt(tParams.leftMass) * 1.1;
+    const weightCenterY = hangerYL + hangerLen + r_weight;
+    const weightBottomY = weightCenterY + r_weight;
+
     ctx.fillStyle = '#64748b';
     ctx.beginPath();
-    ctx.arc(hangerXL, hangerYL + 40 + r_weight, r_weight, 0, 2 * Math.PI);
+    ctx.arc(hangerXL, weightCenterY, r_weight, 0, 2 * Math.PI);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = '9px monospace';
+    ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('W', hangerXL, hangerYL + 40 + r_weight + 3);
+    ctx.fillText('W', hangerXL, weightCenterY + 3);
 
-    // Left force vector (Red arrow)
+    // Left force vector (Red arrow - dynamically clamped to canvas bottom)
     if (tParams.leftMass > 0) {
-        const arrowLen = Math.min(80, 10 + M_kg * g * 350);
-        ctx.strokeStyle = '#ef4444';
-        ctx.fillStyle = '#ef4444';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(hangerXL, hangerYL + 40 + r_weight * 2);
-        ctx.lineTo(hangerXL, hangerYL + 40 + r_weight * 2 + arrowLen);
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.moveTo(hangerXL, hangerYL + 40 + r_weight * 2 + arrowLen);
-        ctx.lineTo(hangerXL - 3, hangerYL + 40 + r_weight * 2 + arrowLen - 5);
-        ctx.lineTo(hangerXL + 3, hangerYL + 40 + r_weight * 2 + arrowLen - 5);
-        ctx.fill();
+        const availableSpace = h - 14 - weightBottomY;
+        const desiredLen = 10 + M_kg * g * 250;
+        const arrowLen = Math.max(6, Math.min(availableSpace, desiredLen));
+
+        if (arrowLen >= 6 && availableSpace > 5) {
+            ctx.strokeStyle = '#ef4444';
+            ctx.fillStyle = '#ef4444';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(hangerXL, weightBottomY);
+            ctx.lineTo(hangerXL, weightBottomY + arrowLen);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(hangerXL, weightBottomY + arrowLen);
+            ctx.lineTo(hangerXL - 4, weightBottomY + arrowLen - 6);
+            ctx.lineTo(hangerXL + 4, weightBottomY + arrowLen - 6);
+            ctx.fill();
+        }
     }
 
     // Label Left Distance "x"
     ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 0.75;
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(cx, cy - 25);
-    ctx.lineTo(hangerXL, cy - 25);
+    ctx.moveTo(cx, cy - 20);
+    ctx.lineTo(hangerXL, cy - 20);
     ctx.stroke();
-    ctx.font = '9px Prompt';
+    ctx.font = '10px Prompt';
     ctx.fillStyle = '#cbd5e1';
-    ctx.fillText(`x = ${tParams.leftX.toFixed(1)} cm`, (cx + hangerXL) / 2, cy - 29);
+    ctx.fillText(`x = ${tParams.leftX.toFixed(1)} cm`, (cx + hangerXL) / 2, cy - 24);
 
     // 5. Draw Right Hanger & Ring
     const dy_px = (tParams.rightY / 30) * beamHalfLen;
     const hangerXR = cx + dy_px * Math.cos(tParams.beamAngle);
     const hangerYR = cy - dy_px * Math.sin(tParams.beamAngle);
 
-    const stringLen = 50;
+    const stringLen = Math.min(48, h * 0.17);
     const ringY_px = hangerYR + stringLen;
 
     ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(hangerXR, hangerYR);
     ctx.lineTo(hangerXR, ringY_px);
     ctx.stroke();
 
-    const beakerW = 80;
-    const beakerH = 50;
+    const beakerW = Math.min(110, w * 0.22);
+    const beakerH = Math.min(60, h * 0.20);
     const beakerY = cy + stringLen - 10;
     const liquidSurfaceY = cy + stringLen; 
     
-    let fluidColor = 'rgba(6, 182, 212, 0.25)'; 
-    if (tParams.fluidTension === 0.0640) fluidColor = 'rgba(249, 115, 22, 0.20)'; 
-    else if (tParams.fluidTension === 0.0250) fluidColor = 'rgba(20, 184, 166, 0.25)'; 
-    else if (tParams.fluidTension === 0.0223) fluidColor = 'rgba(139, 92, 246, 0.15)'; 
-    else if (tParams.fluidTension < 0.0350) fluidColor = 'rgba(148, 163, 184, 0.25)'; 
-    else if (tParams.fluidTension > 0.0350) fluidColor = 'rgba(6, 182, 212, 0.25)'; 
+    let fluidColor = 'rgba(6, 182, 212, 0.30)'; 
+    if (tParams.fluidTension === 0.0640) fluidColor = 'rgba(249, 115, 22, 0.25)'; 
+    else if (tParams.fluidTension === 0.0250) fluidColor = 'rgba(20, 184, 166, 0.30)'; 
+    else if (tParams.fluidTension === 0.0223) fluidColor = 'rgba(139, 92, 246, 0.20)'; 
+    else if (tParams.fluidTension < 0.0350) fluidColor = 'rgba(148, 163, 184, 0.30)'; 
+    else if (tParams.fluidTension > 0.0350) fluidColor = 'rgba(6, 182, 212, 0.30)'; 
 
     ctx.fillStyle = fluidColor;
     ctx.fillRect(hangerXR - beakerW / 2 + 2, liquidSurfaceY, beakerW - 4, beakerH - 2);
 
     ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(hangerXR - beakerW / 2, beakerY);
     ctx.lineTo(hangerXR - beakerW / 2, beakerY + beakerH);
@@ -1448,13 +1503,13 @@ function renderTensionLoop() {
     ctx.lineTo(hangerXR + beakerW / 2, beakerY);
     ctx.stroke();
 
-    const ringR_px = 6 + tParams.ringR * 6; 
+    const ringR_px = 7 + tParams.ringR * 6; 
     if (!tParams.filmRuptured) {
         if (ringY_px < liquidSurfaceY) {
             const stretch_px = liquidSurfaceY - ringY_px;
             const stretch_ratio = Math.min(1.0, stretch_px / (z_max * 100 * 3.5)); 
 
-            ctx.fillStyle = fluidColor.replace('0.25', '0.55').replace('0.20', '0.50').replace('0.15', '0.40');
+            ctx.fillStyle = fluidColor.replace('0.30', '0.65').replace('0.25', '0.60').replace('0.20', '0.50');
             ctx.beginPath();
             
             const neck = ringR_px * (1.0 - stretch_ratio * 0.4);
@@ -1465,8 +1520,8 @@ function renderTensionLoop() {
             ctx.closePath();
             ctx.fill();
 
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-            ctx.lineWidth = 1.2;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(hangerXR - ringR_px, ringY_px);
             ctx.quadraticCurveTo(hangerXR - neck, (ringY_px + liquidSurfaceY) / 2, hangerXR - ringR_px, liquidSurfaceY);
@@ -1480,54 +1535,56 @@ function renderTensionLoop() {
     ctx.lineWidth = 2.5;
     ctx.fillStyle = '#64748b';
     ctx.beginPath();
-    ctx.ellipse(hangerXR, ringY_px, ringR_px, 4, 0, 0, 2 * Math.PI);
+    ctx.ellipse(hangerXR, ringY_px, ringR_px, 5, 0, 0, 2 * Math.PI);
     ctx.fill();
     ctx.stroke();
 
+    // Ring mass arrow (Yellow)
     if (tParams.ringMass > 0) {
         ctx.strokeStyle = '#eab308';
         ctx.fillStyle = '#eab308';
-        ctx.lineWidth = 1.5;
-        const arRing = Math.min(40, 5 + m_kg * g * 100);
+        ctx.lineWidth = 2;
+        const arRing = Math.min(35, 6 + m_kg * g * 100);
         ctx.beginPath();
-        ctx.moveTo(hangerXR, ringY_px + 4);
-        ctx.lineTo(hangerXR, ringY_px + 4 + arRing);
+        ctx.moveTo(hangerXR, ringY_px + 5);
+        ctx.lineTo(hangerXR, ringY_px + 5 + arRing);
         ctx.stroke();
         
         ctx.beginPath();
-        ctx.moveTo(hangerXR, ringY_px + 4 + arRing);
-        ctx.lineTo(hangerXR - 2.5, ringY_px + 4 + arRing - 4);
-        ctx.lineTo(hangerXR + 2.5, ringY_px + 4 + arRing - 4);
+        ctx.moveTo(hangerXR, ringY_px + 5 + arRing);
+        ctx.lineTo(hangerXR - 3, ringY_px + 5 + arRing - 5);
+        ctx.lineTo(hangerXR + 3, ringY_px + 5 + arRing - 5);
         ctx.fill();
     }
 
+    // Surface tension force arrow (Cyan Blue #38bdf8 to match legend!)
     if (Fs > 0 && !tParams.filmRuptured) {
-        ctx.strokeStyle = '#e6915d';
-        ctx.fillStyle = '#e6915d';
-        ctx.lineWidth = 2;
-        const arFs = Math.min(60, 5 + Fs * 300);
+        ctx.strokeStyle = '#38bdf8';
+        ctx.fillStyle = '#38bdf8';
+        ctx.lineWidth = 2.5;
+        const arFs = Math.min(50, 6 + Fs * 300);
         ctx.beginPath();
-        ctx.moveTo(hangerXR, ringY_px + 4);
-        ctx.lineTo(hangerXR, ringY_px + 4 + arFs);
+        ctx.moveTo(hangerXR, ringY_px + 5);
+        ctx.lineTo(hangerXR, ringY_px + 5 + arFs);
         ctx.stroke();
         
         ctx.beginPath();
-        ctx.moveTo(hangerXR, ringY_px + 4 + arFs);
-        ctx.lineTo(hangerXR - 3, ringY_px + 4 + arFs - 5);
-        ctx.lineTo(hangerXR + 3, ringY_px + 4 + arFs - 5);
+        ctx.moveTo(hangerXR, ringY_px + 5 + arFs);
+        ctx.lineTo(hangerXR - 4, ringY_px + 5 + arFs - 6);
+        ctx.lineTo(hangerXR + 4, ringY_px + 5 + arFs - 6);
         ctx.fill();
     }
 
     // Label Right Distance "y"
     ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 0.75;
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(cx, cy - 15);
-    ctx.lineTo(hangerXR, cy - 15);
+    ctx.moveTo(cx, cy - 12);
+    ctx.lineTo(hangerXR, cy - 12);
     ctx.stroke();
-    ctx.font = '9px Prompt';
+    ctx.font = '10px Prompt';
     ctx.fillStyle = '#cbd5e1';
-    ctx.fillText(`y = ${tParams.rightY.toFixed(1)} cm`, (cx + hangerXR) / 2, cy - 19);
+    ctx.fillText(`y = ${tParams.rightY.toFixed(1)} cm`, (cx + hangerXR) / 2, cy - 16);
 
     activeAnimFrame = requestAnimationFrame(renderTensionLoop);
 }
@@ -1543,22 +1600,22 @@ function initCanvases() {
         const vgCanvas = document.getElementById('viscosityGraphCanvas');
         const tCanvas = document.getElementById('tensionCanvas');
 
-        // Resize each canvas independently (don't require all to exist)
-        if (bCanvas) {
-            bCanvas.width = bCanvas.parentElement.clientWidth || 300;
-            bCanvas.height = 224;
+        // Resize each canvas independently to fill parent container
+        if (bCanvas && bCanvas.parentElement) {
+            bCanvas.width = bCanvas.parentElement.clientWidth || 340;
+            bCanvas.height = Math.max(280, bCanvas.parentElement.clientHeight || 300);
         }
-        if (vCanvas) {
-            vCanvas.width = vCanvas.parentElement.clientWidth || 100;
-            vCanvas.height = 208;
+        if (vCanvas && vCanvas.parentElement) {
+            vCanvas.width = vCanvas.parentElement.clientWidth || 110;
+            vCanvas.height = Math.max(240, vCanvas.parentElement.clientHeight || 260);
         }
-        if (vgCanvas) {
-            vgCanvas.width = vgCanvas.parentElement.clientWidth || 250;
-            vgCanvas.height = 176;
+        if (vgCanvas && vgCanvas.parentElement) {
+            vgCanvas.width = vgCanvas.parentElement.clientWidth || 220;
+            vgCanvas.height = Math.max(220, vgCanvas.parentElement.clientHeight || 240);
         }
-        if (tCanvas) {
-            tCanvas.width = tCanvas.parentElement.clientWidth || 340;
-            tCanvas.height = 224;
+        if (tCanvas && tCanvas.parentElement) {
+            tCanvas.width = tCanvas.parentElement.clientWidth || 400;
+            tCanvas.height = Math.max(300, tCanvas.parentElement.clientHeight || 320);
         }
 
         stopSimulations();
