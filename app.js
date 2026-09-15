@@ -195,6 +195,12 @@ let examSubmissionInProgress = false;
 let examStudentInfo = {};
 let examSeed = null;
 let examExitGuardEnabled = false;
+let examAttemptCounter = parseInt(localStorage.getItem('exam_attempt_counter_17') || '0', 10);
+
+// Anti-Cheat State
+const CHEAT_STATE_KEY = 'exam_cheat_log_17_2';
+let cheatLog = { tabSwitchCount: 0, refreshCount: 0, events: [], sessionId: null };
+let lastCheatEventTime = 0; // debounce timestamp to prevent double-counting
 
 // --- Helper Math / Format Functions ---
 function cleanAndParseNumber(str) {
@@ -1647,8 +1653,8 @@ const QUESTION_TEMPLATES = [
         text: (p) => `ดึงห่วงวงแหวนบางรัศมี \\( ${p.r_cm} \\text{ cm} \\) ขึ้นจากผิวของของเหลวชนิดหนึ่ง พบว่าต้องออกแรงดึงมากกว่าน้ำหนักห่วงทรานสวิสเป็นปริมาณ \\( ${p.r ? `(${p.f_base} + \\ ${p.r * 0.005})` : p.f} \\text{ N} \\) พอดีตอนที่ห่วงหลุดพ้นผิว จงหาค่าสัมประสิทธิ์ความตึงผิวของของเหลวนี้`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
-            const r_cm = seed ? getSeededRandomBase('17_2_1_ring_r', seed, 5.0, 15.0, 1.0) : 10.0;
-            const f_base = seed ? getSeededRandomBase('17_2_1_ring_f', seed, 0.08, 0.20, 0.01) : 0.12;
+            const r_cm = seed ? getSeededRandomBase('17_2_1_ring_r', seed, 3.0, 20.0, 0.5) : 10.0;
+            const f_base = seed ? getSeededRandomBase('17_2_1_ring_f', seed, 0.05, 0.30, 0.005) : 0.12;
             const f = seed ? f_base + offset * 0.005 : 0.12;
 
             const radius_m = r_cm / 100;
@@ -1674,28 +1680,30 @@ const QUESTION_TEMPLATES = [
         id: '17_2_1_plate_tension', topic: '17.2.1', type: 'numeric_single',
         title: 'ความตึงผิวของแผ่นกระจกบางสัมผัส 2 ด้าน',
         inputs: [{ label: 'สัมประสิทธิ์ความตึงผิว \\( (\\text{N/m}) \\):' }],
-        text: (p) => `นำแผ่นกระจกแบนหน้ากว้าง \\( ${p.w_cm} \\text{ cm} \\) ไปแตะผิวของเหลวชนิดหนึ่งและดึงขึ้นตรงๆ ช้าๆ โดยต้องออกแรงต้านเนื่องจากความตึงผิวมากกว่าน้ำหนักของแผ่นกระจกเป็นปริมาณ \\( ${p.r ? `(${p.f_base} + \\ ${p.r * 0.01})` : p.f} \\text{ N} \\) จงคำนวณหาสัมประสิทธิ์ความตึงผิวของเหลว`,
+        text: (p) => `นำแผ่นกระจกแบนหน้ากว้าง \\( ${p.w_cm} \\text{ cm} \\) ไปแตะผิวของเหลวชนิดหนึ่งและดึงขึ้นตรงๆ ช้าๆ โดยต้องออกแรงต้านเนื่องจากความตึงผิวมากกว่าน้ำหนักของแผ่นกระจกเป็นปริมาณ \\( ${p.f.toFixed(4)} \\text{ N} \\) จงคำนวณหาสัมประสิทธิ์ความตึงผิวของเหลว`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
-            const w_cm = seed ? getSeededRandomBase('17_2_1_plate_w', seed, 8.0, 20.0, 1.0) : 10.0;
-            const f_base = seed ? getSeededRandomBase('17_2_1_plate_f', seed, 0.10, 0.30, 0.02) : 0.15;
-            const f = seed ? f_base + offset * 0.01 : 0.15;
+            const w_cm_list = [5.0, 10.0, 20.0, 25.0];
+            const w_cm = seed ? w_cm_list[Math.floor(getSeededRandomBase('17_2_1_plate_w', seed, 0, w_cm_list.length - 1, 1))] : 10.0;
+            const gamma_list = [0.04, 0.05, 0.06, 0.075, 0.08, 0.10, 0.12, 0.15, 0.20, 0.25];
+            const gamma_idx = seed ? Math.floor(getSeededRandomBase('17_2_1_plate_g', seed, 0, gamma_list.length - 1, 1)) : 3;
+            const gamma = gamma_list[(gamma_idx + offset) % gamma_list.length];
 
             const w_m = w_cm / 100;
             const L_total = 2 * w_m;
-            const gamma = f / L_total;
+            const f = parseFloat((gamma * L_total).toFixed(4));
 
             return {
-                params: { w_cm, f: parseFloat(f.toFixed(4)), f_base, r: offset },
-                answers: [`\\( ${formatScientificLaTeX(gamma, 3)} \\)`, gamma.toFixed(4), gamma.toFixed(3)],
+                params: { w_cm, f, gamma },
+                answers: [`\\( ${formatScientificLaTeX(gamma, 3)} \\)`, gamma.toFixed(4), gamma.toFixed(3), gamma.toString()],
                 answersRaw: [gamma],
                 explanation: () => `
           จากสูตรสัมประสิทธิ์ความตึงผิวของแผ่นกระจกบางสัมผัสของเหลว 2 ด้านยาว:<br>
           \\( \\gamma = \\frac{F}{L} = \\frac{F}{2w} \\)<br>
-          - แรงดึงผิวสัมบูรณ์ \\( F = ${offset ? `(${f_base.toFixed(2)} + ${(offset * 0.01).toFixed(2)}) = ` : ''}${f.toFixed(4)} \\text{ N} \\)<br>
+          - แรงดึงผิวสัมบูรณ์ \\( F = ${f.toFixed(4)} \\text{ N} \\)<br>
           - ความยาวหน้าสัมผัส \\( w = ${w_cm} \\text{ cm} = ${w_m.toFixed(2)} \\text{ m} \\)<br>
           แทนค่าคำนวณ:<br>
-          \\( \\gamma = \\frac{${f.toFixed(4)}}{2 \\cdot ${w_m.toFixed(2)}} = ${gamma.toFixed(4)} \\text{ N/m} \\)
+          \\( \\gamma = \\frac{${f.toFixed(4)}}{2 \\cdot ${w_m.toFixed(2)}} = ${gamma} \\text{ N/m} \\)
         `
             };
         }
@@ -1803,7 +1811,7 @@ const QUESTION_TEMPLATES = [
         text: (p) => `นักสำรวจเรือดำน้ำวัดค่าความลึกตรงจุดก้นน้ำทะเลลึกได้เป็นระยะทาง \\( ${p.r ? `(${p.h_base} + \\ ${p.r * 2})` : p.h} \\text{ m} \\) ถ้าน้ำทะเลความหนาแน่นเฉลี่ย \\( 1.02 \\times 10^3 \\text{ kg/m}^3 \\) จงคำนวณหา (1) ความดันเกจ และ (2) ความดันสัมบูรณ์ ณ ความลึกนี้ (กำหนดความดันบรรยากาศ \\( P_0 = 1.0 \\times 10^5 \\text{ Pa} \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
-            const h_base = seed ? getSeededRandomBase('17_3_1_press_h', seed, 40, 100, 10) : 80;
+            const h_base = seed ? getSeededRandomBase('17_3_1_press_h', seed, 20, 120, 5) : 80;
             const h = seed ? h_base + offset * 2 : 100;
 
             const rho = 1020;
@@ -1831,8 +1839,8 @@ const QUESTION_TEMPLATES = [
         text: (p) => `หน้าต่างทรงกลมสำหรับชมทัศนียภาพของเรือดำน้ำมีพื้นที่ผิว \\( ${p.area} \\text{ m}^2 \\) ดำลงไปลึกใต้ทะเล \\( ${p.r ? `(${p.h_base} + \\ ${p.r})` : p.h} \\text{ m} \\) จงหาแรงลัพธ์สัมบูรณ์ทั้งหมดที่กระทำบนฝาหน้าต่างนี้ภายนอก (กำหนดความหนาแน่นน้ำทะเล \\( 1.03 \\times 10^3 \\text{ kg/m}^3 \\), \\( P_0 = 1.0 \\times 10^5 \\text{ Pa} \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
-            const area = seed ? getSeededRandomBase('17_3_1_sub_a', seed, 0.2, 0.8, 0.1) : 0.5;
-            const h_base = seed ? getSeededRandomBase('17_3_1_sub_h', seed, 30, 70, 5) : 40;
+            const area = seed ? getSeededRandomBase('17_3_1_sub_a', seed, 0.1, 1.0, 0.05) : 0.5;
+            const h_base = seed ? getSeededRandomBase('17_3_1_sub_h', seed, 20, 100, 5) : 40;
             const h = seed ? h_base + offset : 50;
 
             const rho = 1030;
@@ -1882,30 +1890,31 @@ const QUESTION_TEMPLATES = [
         id: '17_3_2_piston_force', topic: '17.3.2', type: 'numeric_single',
         title: 'แรงกดขั้นต่ำในเครื่องอัดไฮดรอลิก',
         inputs: [{ label: 'แรงกดบนลูกสูบเล็ก \\( (\\text{N}) \\):' }],
-        text: (p) => `เครื่องอัดไฮดรอลิกท่อปิดลูกสูบเล็กมีรัศมี \\( ${p.r} \\text{ cm} \\) และลูกสูบยกฝั่งใหญ่มีรัศมี \\( ${p.R} \\text{ cm} \\) ถ้าต้องการชูยกรถยนต์บรรทุกหนัก \\( ${p.r ? `(${p.m_base} + \\ ${p.r * 20})` : p.m} \\text{ kg} \\) ฝั่งลูกสูบใหญ่ จงหาแรงกดขั้นต่ำที่จำเป็นต้องมีที่ลูกสูบเล็กฝั่งนี้ (กำหนดให้ \\( g = 10 \\text{ m/s}^2 \\))`,
+        text: (p) => `เครื่องอัดไฮดรอลิกท่อปิดลูกสูบเล็กมีรัศมี \\( ${p.r} \\text{ cm} \\) และลูกสูบยกฝั่งใหญ่มีรัศมี \\( ${p.R} \\text{ cm} \\) ถ้าต้องการชูยกรถยนต์บรรทุกหนัก \\( ${p.r_offset ? `(${p.m_base.toLocaleString()} + \\ ${(p.r_offset * 50).toLocaleString()})` : p.m.toLocaleString()} \\text{ kg} \\) ฝั่งลูกสูบใหญ่ จงหาแรงกดขั้นต่ำที่จำเป็นต้องมีที่ลูกสูบเล็กฝั่งนี้ (กำหนดให้ \\( g = 10 \\text{ m/s}^2 \\))`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
-            const r = seed ? getSeededRandomBase('17_3_2_press_r', seed, 2, 5, 1) : 3;
-            const R = seed ? getSeededRandomBase('17_3_2_press_R', seed, 20, 50, 5) : 30;
-            const m_base = seed ? getSeededRandomBase('17_3_2_press_m', seed, 800, 1600, 100) : 1200;
-            const m = seed ? m_base + offset * 20 : 1200;
+            const r = seed ? getSeededRandomBase('17_3_2_press_r', seed, 1, 5, 1) : 3;
+            const M_list = [5, 10];
+            const M = seed ? M_list[Math.floor(getSeededRandomBase('17_3_2_press_M', seed, 0, M_list.length - 1, 1))] : 10;
+            const R = r * M;
+            const m_base = seed ? getSeededRandomBase('17_3_2_press_m', seed, 800, 2000, 100) : 1200;
+            const m = seed ? m_base + (offset % 10) * 50 : 1200;
 
             const forceLarge = m * 10;
-            const areaRatio = Math.pow(r / R, 2);
-            const forceSmall = forceLarge * areaRatio;
+            const forceSmall = Math.round(forceLarge / (M * M));
 
             return {
                 params: { r, R, m, m_base, r_offset: offset },
-                answers: [forceSmall.toFixed(1), forceSmall.toFixed(0), forceSmall.toFixed(2)],
+                answers: [forceSmall.toFixed(0), forceSmall.toFixed(1), forceSmall.toFixed(2)],
                 answersRaw: [forceSmall],
                 explanation: () => `
           จากทฤษฎีการส่งผ่านความดันของพาสคัล (Pascal's Principle): \\( \\frac{f}{a} = \\frac{F}{A} \\)<br>
           เมื่อท่อสูบเป็นวงกลม: \\( a = \\pi r^2 \\) และ \\( A = \\pi R^2 \\)<br>
-          จัดรูปสมการหาแรงกดขนาดเล็ก: \\( f = F \\cdot \\left(\\frac{r}{R}\\right)^2 \\)<br>
-          - แรงต้านขนาดใหญ่: \\( F = mg = ${m} \\cdot 10 = ${forceLarge.toLocaleString()} \\text{ N} \\)<br>
-          - อัตราส่วนรัศมี: \\( r/R = ${r}/${R} \\)<br>
+          จัดรูปสมการหาแรงกดขนาดเล็ก: \\( f = F \\cdot \\left(\\frac{r}{R}\\right)^2 = F \\cdot \\left(\\frac{1}{${M}}\\right)^2 \\)<br>
+          - แรงต้านขนาดใหญ่: \\( F = mg = ${m.toLocaleString()} \\cdot 10 = ${forceLarge.toLocaleString()} \\text{ N} \\)<br>
+          - อัตราส่วนรัศมี: \\( r/R = ${r}/${R} = 1/${M} \\)<br>
           แทนค่าคำนวณหาแรงกด:<br>
-          \\( f = (${forceLarge.toLocaleString()}) \\cdot \\left(\\frac{${r}}{${R}}\\right)^2 = ${forceSmall.toFixed(2)} \\text{ N} \\)
+          \\( f = (${forceLarge.toLocaleString()}) \\cdot \\left(\\frac{${r}}{${R}}\\right)^2 = \\frac{${forceLarge.toLocaleString()}}{${M * M}} = ${forceSmall} \\text{ N} \\)
         `
             };
         }
@@ -1917,8 +1926,8 @@ const QUESTION_TEMPLATES = [
         text: (p) => `กระบอกสูบไฮดรอลิกผ่อนแรงมีลูกสูบกดรัศมีฝั่งเล็ก \\( ${p.r} \\text{ cm} \\) โดยออกแรงกดลงไป \\( ${p.f} \\text{ N} \\) แล้วส่งผ่านความดันสามารถยกรับน้ำหนักสิ่งของฝั่งใหญ่ได้สูงสุดหนัก \\( ${p.r_offset ? `(${p.F_base.toLocaleString()} + \\ ${p.F_add.toLocaleString()})` : p.F.toLocaleString()} \\text{ N} \\) จงหาขนาดของรัศมีของลูกสูบฝั่งใหญ่ตัวนี้`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
-            const r = seed ? getSeededRandomBase('17_3_2_large_r', seed, 2, 5, 1) : 3;
-            const f = seed ? getSeededRandomBase('17_3_2_large_f', seed, 50, 100, 50) : 100;
+            const r = seed ? getSeededRandomBase('17_3_2_large_r', seed, 1, 6, 1) : 3;
+            const f = seed ? getSeededRandomBase('17_3_2_large_f', seed, 25, 150, 25) : 100;
             
             const M_base = seed ? getSeededRandomBase('17_3_2_large_M', seed, 4, 7, 1) : 5;
             const M = seed ? M_base + (offset % 8) + 1 : 10;
@@ -1953,7 +1962,7 @@ const QUESTION_TEMPLATES = [
         text: (p) => `กระบอกสูบไฮดรอลิกมีลูกสูบยกฝั่งใหญ่รัศมี \\( ${p.R} \\text{ cm} \\) ต้องชูยกรถยนต์หนัก \\( ${p.r_offset ? `(${p.F_base.toLocaleString()} + \\ ${p.F_add.toLocaleString()})` : p.F.toLocaleString()} \\text{ N} \\) โดยออกแรงกดฝั่งเล็กเพียง \\( ${p.f} \\text{ N} \\) จงคำนวณหาขนาดของรัศมีของลูกสูบกดฝั่งเล็กตัวนี้`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
-            const f = seed ? getSeededRandomBase('17_3_2_small_f', seed, 50, 100, 50) : 100;
+            const f = seed ? getSeededRandomBase('17_3_2_small_f', seed, 25, 150, 25) : 100;
             
             const M_base = seed ? getSeededRandomBase('17_3_2_small_M', seed, 4, 7, 1) : 4;
             const M = seed ? M_base + (offset % 5) + 1 : 5;
@@ -1990,8 +1999,8 @@ const QUESTION_TEMPLATES = [
         text: (p) => `แม่แรงไฮดรอลิกมีลูกสูบกดรัศมีฝั่งเล็ก \\( ${p.r} \\text{ cm} \\) ออกแรงกดลงไป \\( ${p.f} \\text{ N} \\) สามารถยกรับมวลรถยนต์ฝั่งใหญ่ได้หนัก \\( ${p.r_offset ? `(${p.m_base.toLocaleString()} + \\ ${p.m_add.toLocaleString()})` : p.m.toLocaleString()} \\text{ kg} \\) จงหารัศมีของลูกสูบฝั่งใหญ่ตัวนี้ (กำหนดให้ \\( g = 10 \\text{ m/s}^2 \\))`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
-            const r = seed ? getSeededRandomBase('17_3_2_mass_r', seed, 2, 5, 1) : 2;
-            const f = seed ? getSeededRandomBase('17_3_2_mass_f', seed, 50, 100, 50) : 100;
+            const r = seed ? getSeededRandomBase('17_3_2_mass_r', seed, 1, 6, 1) : 2;
+            const f = seed ? getSeededRandomBase('17_3_2_mass_f', seed, 20, 160, 20) : 100;
             
             const M_base = seed ? getSeededRandomBase('17_3_2_mass_M', seed, 4, 7, 1) : 5;
             const M = seed ? M_base + (offset % 8) + 1 : 7;
@@ -2027,9 +2036,9 @@ const QUESTION_TEMPLATES = [
         text: (p) => `เครื่องอัดไฮดรอลิกผ่อนแรงออกแรงกดฝั่งเล็กเพียง \\( ${p.f} \\text{ N} \\) สามารถยกรถยนต์หนัก \\( ${p.r_offset ? `(${p.F_base.toLocaleString()} + \\ ${p.F_add.toLocaleString()})` : p.F.toLocaleString()} \\text{ N} \\) จงหาว่าขนาดรัศมีของลูกสูบฝั่งใหญ่เป็นกี่เท่าของรัศมีลูกสูบฝั่งเล็ก`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
-            const f = seed ? getSeededRandomBase('17_3_2_ratio_f', seed, 50, 100, 50) : 50;
+            const f = seed ? getSeededRandomBase('17_3_2_ratio_f', seed, 25, 150, 25) : 50;
             
-            const M_base = seed ? getSeededRandomBase('17_3_2_ratio_M', seed, 6, 10, 2) : 8;
+            const M_base = seed ? getSeededRandomBase('17_3_2_ratio_M', seed, 4, 12, 1) : 8;
             const M = seed ? M_base + (offset % 8) + 1 : 10;
             const ratioSq = M * M;
             
@@ -2081,17 +2090,17 @@ const QUESTION_TEMPLATES = [
         id: '17_3_3_submerged_ratio', topic: '17.3.3', type: 'numeric_single',
         title: 'เศษส่วนลอยน้ำจมน้ำของไม้สถิต',
         inputs: [{ label: 'เปอร์เซ็นต์ปริมาตรส่วนที่จมใต้ระดับผิวน้ำ (%):' }],
-        text: (p) => `ท่อนไม้เนื้อแน่นที่มีระดับความหนาแน่น \\( ${p.r ? `(${p.rho_w_base} + \\ ${p.r * 5})` : p.rho_w} \\text{ kg/m}^3 \\) นำไปลอยอย่างอิสระนิ่งในทะเลสาบน้ำจืด (ความหนาแน่นน้ำจืดเท่ากับ \\( 1000 \\text{ kg/m}^3 \\)) จงหาว่าปริมาตรของท่อนไม้ในส่วนที่จมใต้น้ำคิดเป็นร้อยละเท่าใดของปริมาตรรวมไม้ท่อนนี้`,
+        text: (p) => `ท่อนไม้เนื้อแน่นที่มีระดับความหนาแน่น \\( ${p.r ? `(${p.rho_w_base} + \\ ${p.r * 10})` : p.rho_w} \\text{ kg/m}^3 \\) นำไปลอยอย่างอิสระนิ่งในทะเลสาบน้ำจืด (ความหนาแน่นน้ำจืดเท่ากับ \\( 1000 \\text{ kg/m}^3 \\)) จงหาว่าปริมาตรของท่อนไม้ในส่วนที่จมใต้น้ำคิดเป็นร้อยละเท่าใดของปริมาตรรวมไม้ท่อนนี้`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
-            const rho_w_base = seed ? getSeededRandomBase('17_3_3_sub_rho', seed, 500, 700, 20) : 600;
-            const rho_w = seed ? rho_w_base + offset * 5 : 700;
+            const rho_w_base = seed ? getSeededRandomBase('17_3_3_sub_rho', seed, 400, 800, 20) : 600;
+            const rho_w = seed ? rho_w_base + (offset % 10) * 10 : 700;
 
-            const fraction = (rho_w / 1000) * 100;
+            const fraction = Math.round((rho_w / 1000) * 100);
 
             return {
                 params: { rho_w, rho_w_base, r: offset },
-                answers: [fraction.toFixed(1), fraction.toFixed(0), fraction.toFixed(2)],
+                answers: [fraction.toFixed(0), fraction.toFixed(1), fraction.toFixed(2)],
                 answersRaw: [fraction],
                 explanation: () => `
           จากเงื่อนไขสมดุลของเทหวัตถุจมลอยในน้ำ (ลอยตัวนิ่ง):<br>
@@ -2100,7 +2109,7 @@ const QUESTION_TEMPLATES = [
           หาเศษส่วนการจมใต้ผิวของเหลว:<br>
           \\( \\frac{V_{\\text{sub}}}{V_{\\text{total}}} = \\frac{\\rho_{\\text{wood}}}{\\rho_{\\text{water}}} = \\frac{${rho_w}}{1000} \\)<br>
           คิดเป็นเปอร์เซ็นต์ส่วนจมลงใต้น้ำ:<br>
-          \\( \\text{Percentage} = \\frac{${rho_w}}{1000} \\cdot 100\\% = ${fraction.toFixed(1)}\\% \\)
+          \\( \\text{Percentage} = \\frac{${rho_w}}{1000} \\cdot 100\\% = ${fraction}\\% \\)
         `
             };
         }
@@ -2109,22 +2118,22 @@ const QUESTION_TEMPLATES = [
         id: '17_3_3_apparent_weight', topic: '17.3.3', type: 'numeric_single',
         title: 'น้ำหนักปรากฏก้อนหินเมื่อแช่อยู่ใต้น้ำ',
         inputs: [{ label: 'น้ำหนักปรากฏบนสปริง \\( (\\text{N}) \\):' }],
-        text: (p) => `ก้อนวัตถุแกนหินก้อนหนึ่งมีปริมาตรปริซึม \\( ${p.r ? `(${p.vol_L_base} + \\ ${p.r * 0.1})` : p.vol_L} \\text{ L} \\) และมีความหนาแน่นเฉลี่ย \\( 2.8 \\times 10^3 \\text{ kg/m}^3 \\) แขวนติดตาชั่งสปริงอ่านแรงดึงยื่นลงไปแช่ในอ่างน้ำจนมิดตัว จงหาค่าน้ำหนักแรงดึงที่อ่านได้จากตราชั่งสปริงขวดนี้ (กำหนดให้น้ำความหนาแน่น \\( 1000 \\text{ kg/m}^3 \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
+        text: (p) => `ก้อนวัตถุแกนหินก้อนหนึ่งมีปริมาตรปริซึม \\( ${p.r ? `(${p.vol_L_base.toFixed(1)} + \\ ${(p.r * 0.5).toFixed(1)})` : p.vol_L.toFixed(1)} \\text{ L} \\) และมีความหนาแน่นเฉลี่ย \\( 2.8 \\times 10^3 \\text{ kg/m}^3 \\) แขวนติดตาชั่งสปริงอ่านแรงดึงยื่นลงไปแช่ในอ่างน้ำจนมิดตัว จงหาค่าน้ำหนักแรงดึงที่อ่านได้จากตราชั่งสปริงขวดนี้ (กำหนดให้น้ำความหนาแน่น \\( 1000 \\text{ kg/m}^3 \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
-            const vol_L_base = seed ? getSeededRandomBase('17_3_3_app_v', seed, 1.0, 3.0, 0.2) : 2.0;
-            const vol_L = seed ? parseFloat((vol_L_base + offset * 0.1).toFixed(1)) : 3.0;
+            const vol_L_base = seed ? getSeededRandomBase('17_3_3_app_v', seed, 1.0, 5.0, 0.5) : 2.0;
+            const vol_L = seed ? parseFloat((vol_L_base + (offset % 5) * 0.5).toFixed(1)) : 3.0;
 
             const vol_m3 = vol_L / 1000;
             const rho_stone = 2800;
             const rho_water = 1000;
             const weight_air = rho_stone * vol_m3 * 10;
             const buoyant = rho_water * vol_m3 * 10;
-            const weight_apparent = weight_air - buoyant;
+            const weight_apparent = Math.round(weight_air - buoyant);
 
             return {
                 params: { vol_L, vol_L_base, r: offset },
-                answers: [weight_apparent.toFixed(1), weight_apparent.toFixed(0), weight_apparent.toFixed(2)],
+                answers: [weight_apparent.toFixed(0), weight_apparent.toFixed(1), weight_apparent.toFixed(2)],
                 answersRaw: [weight_apparent],
                 explanation: () => `
           1. แปลงหน่วยปริมาตรจากลิตร (L) เป็นลูกบาศก์เมตร (\\(\\text{m}^3\\)):<br>
@@ -2134,7 +2143,7 @@ const QUESTION_TEMPLATES = [
           3. หาแรงลอยตัวพยุง (ตามหลักของอาร์คิมีดีส):<br>
           \\( B = \\rho_{\\text{fluid}} \\cdot V_{\\text{sub}} \\cdot g = (1000 \\text{ kg/m}^3 \\cdot ${vol_m3.toFixed(4)} \\text{ m}^3) \\cdot 10 \\text{ m/s}^2 = ${buoyant.toFixed(1)} \\text{ N} \\)<br>
           4. น้ำหนักที่ตาชั่งสปริงอ่านได้ (น้ำหนักปรากฏ):<br>
-          \\( T = W - B = ${weight_air.toFixed(1)} - ${buoyant.toFixed(1)} = ${weight_apparent.toFixed(1)} \\text{ N} \\)
+          \\( T = W - B = ${weight_air.toFixed(1)} - ${buoyant.toFixed(1)} = ${weight_apparent} \\text{ N} \\)
         `
             };
         }
@@ -2174,7 +2183,7 @@ for (let i = 1; i <= 10; i++) {
             text: (p) => `แทงค์คอนกรีตเก็บน้ำขนาดใหญ่สำหรับโรงงานผลิตน้ำประปามีน้ำบรรจุอยู่สูงกักเก็บ \\( ${p.r ? `(${p.h_base} + \\ ${p.r})` : p.h} \\text{ m} \\) จงหาความดันเกจที่ก้นบ่อเก็บ (กำหนดให้ความหนาแน่นน้ำน้ำจืด \\( 1000 \\text{ kg/m}^3 \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
             generate: (seed) => {
                 const offset = getOffsetFromR(seed);
-                const h_base = seed ? getSeededRandomBase(`17_3_1_gen_h_${i}`, seed, 5, 20, 1) : 10;
+                const h_base = seed ? getSeededRandomBase(`17_3_1_gen_h_${i}`, seed, 3, 30, 1) : 10;
                 const h = seed ? h_base + offset : 12;
 
                 const pg = 1000 * 10 * h;
@@ -2197,25 +2206,26 @@ for (let i = 1; i <= 10; i++) {
             id: `17_3_2_gen_hydraulic_${i}`, topic: '17.3.2', type: 'numeric_single',
             title: `การขยายแรงอัดลูกสูบผ่อนแรง (ชุดที่ ${i})`,
             inputs: [{ label: 'แรงกดฝั่งลูกสูบเล็ก \\( (\\text{N}) \\):' }],
-            text: (p) => `แม่แรงไฮดรอลิกมีสัดส่วนของพื้นที่หน้าตัดลูกสูบเล็กต่อสูบใหญ่เป็นอัตราส่วน \\( 1 : ${p.ratio} \\) หากยกรถยนต์หนัก \\( ${p.r ? `(${p.F_base} + \\ ${p.r * 100})` : p.F} \\text{ N} \\) จงหาขนาดแรงกดบนฝั่งลูกสูบเล็ก`,
+            text: (p) => `แม่แรงไฮดรอลิกมีสัดส่วนของพื้นที่หน้าตัดลูกสูบเล็กต่อสูบใหญ่เป็นอัตราส่วน \\( 1 : ${p.ratio} \\) หากยกรถยนต์หนัก \\( ${p.r ? `(${p.F_base.toLocaleString()} + \\ ${(p.r * p.F_step).toLocaleString()})` : p.F.toLocaleString()} \\text{ N} \\) จงหาขนาดแรงกดบนฝั่งลูกสูบเล็ก`,
             generate: (seed) => {
                 const offset = getOffsetFromR(seed);
-                const ratio = seed ? getSeededRandomBase(`17_3_2_gen_r_${i}`, seed, 50, 150, 10) : 100;
-                const F_base = seed ? getSeededRandomBase(`17_3_2_gen_F_${i}`, seed, 10000, 20000, 1000) : 12000;
-                const F = seed ? F_base + offset * 100 : 12000;
-
-                const f = F / ratio;
+                const ratio = seed ? getSeededRandomBase(`17_3_2_gen_r_${i}`, seed, 20, 150, 10) : 100;
+                const f_base = seed ? getSeededRandomBase(`17_3_2_gen_f_${i}`, seed, 40, 200, 10) : 120;
+                const f = seed ? f_base + (offset % 5) * 10 : 120;
+                const F = f * ratio;
+                const F_base = f_base * ratio;
+                const F_step = 10 * ratio;
 
                 return {
-                    params: { ratio, F, F_base, r: offset },
-                    answers: [f.toFixed(1), f.toFixed(0), f.toFixed(2)],
+                    params: { ratio, F, F_base, F_step, r: offset % 5 },
+                    answers: [f.toFixed(0), f.toFixed(1), f.toFixed(2)],
                     answersRaw: [f],
                     explanation: () => `
             จากอัตราการส่งทอดความดัน: \\( \\frac{f}{a} = \\frac{F}{A} \\Rightarrow f = F \\cdot \\left( \\frac{a}{A} \\right) \\)<br>
             - สัดส่วนพื้นที่หน้าตัด \\( a/A = 1/${ratio} \\)<br>
             - แรงดึงฝั่งยก \\( F = ${F.toLocaleString()} \\text{ N} \\)<br>
             แทนค่าในสูตร:<br>
-            \\( f = \\frac{${F.toLocaleString()}}{${ratio}} = ${f.toFixed(2)} \\text{ N} \\)
+            \\( f = \\frac{${F.toLocaleString()}}{${ratio}} = ${f} \\text{ N} \\)
           `
                 };
             }
@@ -2392,9 +2402,15 @@ function startExamProcess() {
     }
 
     const timestamp = Date.now();
-    examSeed = `${num}_${timestamp}`;
+    examAttemptCounter++;
+    localStorage.setItem('exam_attempt_counter_17', examAttemptCounter.toString());
+    examSeed = `${num}_${timestamp}_att${examAttemptCounter}`;
     examDurationSeconds = 15 * 60;
     examStudentInfo = { name, class: cls, number: num, seed: examSeed };
+
+    // Reset cheat log for new exam session
+    cheatLog = { tabSwitchCount: 0, refreshCount: 0, events: [], sessionId: examSeed };
+    saveCheatLog();
 
     // 4 Subtopics for calculation (Numeric Input): 17.2.1, 17.3.1, 17.3.2, 17.3.3
     const numericSubtopics = ['17.2.1', '17.3.1', '17.3.2', '17.3.3'];
@@ -2408,10 +2424,14 @@ function startExamProcess() {
         }
     });
 
-    // Select exactly 1 choice question randomly from all choice templates (Total = 1 choice question)
+    // Select exactly 1 choice question randomly from all choice templates (avoid repeating recent questions)
     const allChoiceQs = QUESTION_TEMPLATES.filter(q => q.type === 'choice');
     if (allChoiceQs.length > 0) {
-        selectedTemplates.push(pureShuffle(allChoiceQs)[0]);
+        const examHist = getHistory();
+        const availableChoices = allChoiceQs.filter(q => !examHist.includes(q.id));
+        const pickedChoice = (availableChoices.length > 0 ? pureShuffle(availableChoices) : pureShuffle(allChoiceQs))[0];
+        selectedTemplates.push(pickedChoice);
+        addToHistory(pickedChoice.id);
     }
 
     selectedTemplates = pureShuffle(selectedTemplates);
@@ -2423,7 +2443,7 @@ function startExamProcess() {
         
         while (attempts < 100) {
             attempts++;
-            const seed = `${num}_${timestamp}_${template.id}_${attempts}`;
+            const seed = `${num}_${timestamp}_att${examAttemptCounter}_${template.id}_${attempts}`;
             instance = template.generate(seed);
             
             const vals = getActiveParamValues(instance.params);
@@ -2456,6 +2476,7 @@ function startExamProcess() {
     document.getElementById('lbl-exam-user-info').innerHTML = `${name} (ม.6/${cls} เลขที่ ${num})`;
 
     renderExamLiveDOM();
+    attachAnswerSaveListeners();
 
     examStartTimestamp = Date.now();
     examDeadlineTimestamp = examStartTimestamp + (examDurationSeconds * 1000);
@@ -2463,7 +2484,7 @@ function startExamProcess() {
     examIsActive = true;
     examSubmissionInProgress = false;
 
-    sessionStorage.setItem(EXAM_STATE_KEY, JSON.stringify({
+    localStorage.setItem(EXAM_STATE_KEY, JSON.stringify({
         examQuestions: currentExamQuestions, studentInfo: examStudentInfo, examStartTimestamp, examDeadlineTimestamp, examDurationSeconds
     }));
 
@@ -2476,13 +2497,135 @@ function setupExamLocks() {
     examExitGuardEnabled = true;
     document.body.classList.add('exam-locked');
     window.addEventListener('beforeunload', handleExamBeforeUnload);
+    initAntiCheat();
 }
 function releaseExamLocks() {
     examExitGuardEnabled = false;
     document.body.classList.remove('exam-locked');
     window.removeEventListener('beforeunload', handleExamBeforeUnload);
+    releaseAntiCheat();
 }
 function handleExamBeforeUnload(e) { if (examIsActive) { e.preventDefault(); e.returnValue = ''; } }
+
+// --- Anti-Cheat System ---
+function initAntiCheat() {
+    document.addEventListener('visibilitychange', handleTabSwitch);
+    window.addEventListener('blur', handleWindowBlur);
+    loadCheatLog();
+}
+
+function releaseAntiCheat() {
+    document.removeEventListener('visibilitychange', handleTabSwitch);
+    window.removeEventListener('blur', handleWindowBlur);
+}
+
+function handleTabSwitch() {
+    if (!examIsActive) return;
+    if (document.hidden) {
+        const now = Date.now();
+        if (now - lastCheatEventTime < 500) return; // debounce
+        lastCheatEventTime = now;
+        cheatLog.tabSwitchCount++;
+        cheatLog.events.push({ type: 'tab_switch', time: now });
+        saveCheatLog();
+        showCheatWarning(`ตรวจพบการสลับแท็บ (ครั้งที่ ${cheatLog.tabSwitchCount})`);
+    }
+}
+
+function handleWindowBlur() {
+    if (!examIsActive) return;
+    if (!document.hidden) {
+        const now = Date.now();
+        if (now - lastCheatEventTime < 500) return; // debounce
+        lastCheatEventTime = now;
+        cheatLog.tabSwitchCount++;
+        cheatLog.events.push({ type: 'window_blur', time: now });
+        saveCheatLog();
+        showCheatWarning(`ตรวจพบการออกจากหน้าต่างสอบ (ครั้งที่ ${cheatLog.tabSwitchCount})`);
+    }
+}
+
+function saveCheatLog() {
+    try {
+        localStorage.setItem(CHEAT_STATE_KEY, JSON.stringify(cheatLog));
+    } catch(e) { console.error('Failed to save cheat log', e); }
+}
+
+function loadCheatLog() {
+    try {
+        const saved = localStorage.getItem(CHEAT_STATE_KEY);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.sessionId === examSeed) {
+                cheatLog = parsed;
+            }
+        }
+        cheatLog.sessionId = examSeed;
+    } catch(e) { /* ignore */ }
+}
+
+let cheatWarningTimeout = null;
+function showCheatWarning(msg) {
+    const banner = document.getElementById('cheat-warning-banner');
+    const text = document.getElementById('cheat-warning-text');
+    if (!banner || !text) return;
+    text.innerText = msg;
+    banner.classList.remove('hidden');
+    banner.style.opacity = '1';
+    banner.style.transform = 'translateX(0)';
+    if (cheatWarningTimeout) clearTimeout(cheatWarningTimeout);
+    cheatWarningTimeout = setTimeout(() => {
+        banner.style.opacity = '0';
+        banner.style.transform = 'translateX(100%)';
+        setTimeout(() => banner.classList.add('hidden'), 400);
+    }, 3500);
+}
+
+// --- Save Exam Answers to State ---
+const debouncedSaveAnswers = debounce(saveExamAnswersToState, 500);
+
+function saveExamAnswersToState() {
+    if (!examIsActive) return;
+    try {
+        const answers = getExamAnswers();
+        const saved = localStorage.getItem(EXAM_STATE_KEY);
+        if (saved) {
+            const state = JSON.parse(saved);
+            state.savedAnswers = answers;
+            localStorage.setItem(EXAM_STATE_KEY, JSON.stringify(state));
+        }
+    } catch(e) { console.error('Failed to save exam answers', e); }
+}
+
+function attachAnswerSaveListeners() {
+    const container = document.getElementById('exam-questions-container');
+    if (!container) return;
+    container.querySelectorAll('input[type="text"]').forEach(input => {
+        input.addEventListener('input', debouncedSaveAnswers);
+    });
+    container.querySelectorAll('input[type="radio"]').forEach(input => {
+        input.addEventListener('change', debouncedSaveAnswers);
+    });
+}
+
+function restoreExamAnswers(savedAnswers) {
+    if (!savedAnswers || !Array.isArray(savedAnswers)) return;
+    savedAnswers.forEach((ans, idx) => {
+        if (!ans) return;
+        if (typeof ans === 'string') {
+            // choice question
+            const radios = document.querySelectorAll(`input[name="exam-q${idx}"]`);
+            radios.forEach(r => { if (r.value === ans) r.checked = true; });
+        } else if (Array.isArray(ans)) {
+            // numeric question
+            const v1 = document.getElementById(`exam-q${idx}-val1`);
+            if (v1 && ans[0]) v1.value = ans[0];
+            const v2 = document.getElementById(`exam-q${idx}-val2`);
+            if (v2 && ans[1]) v2.value = ans[1];
+        }
+    });
+}
+
 
 function renderExamLiveDOM() {
     const container = document.getElementById('exam-questions-container');
@@ -2622,10 +2765,12 @@ function submitExam(timeExpired = false) {
 
     const payload = {
         score: total_score, timeTaken: timeStr, studentInfo: examStudentInfo,
-        gradedResults, examQuestions: currentExamQuestions, date: new Date().toLocaleDateString('th-TH')
+        gradedResults, examQuestions: currentExamQuestions, date: new Date().toLocaleDateString('th-TH'),
+        cheatReport: { tabSwitchCount: cheatLog.tabSwitchCount, refreshCount: cheatLog.refreshCount }
     };
     localStorage.setItem('last_exam_results_17_2', JSON.stringify(payload));
-    sessionStorage.removeItem(EXAM_STATE_KEY);
+    localStorage.removeItem(EXAM_STATE_KEY);
+    localStorage.removeItem(CHEAT_STATE_KEY);
 
     updateLatestScore();
     showSection('exam-result');
@@ -2678,6 +2823,34 @@ function renderExamResults(data) {
           <div class="text-xs text-slate-700 bg-cyan-50/50 p-3 rounded-lg math-font border border-cyan-100">${grad.explanationText}</div>
         </div>`;
     });
+
+    // Render cheat report if any cheating was detected
+    const cheatSection = document.getElementById('exam-cheat-report');
+    if (cheatSection) {
+        const cr = data.cheatReport || {};
+        const totalCheat = (cr.tabSwitchCount || 0) + (cr.refreshCount || 0);
+        if (totalCheat > 0) {
+            cheatSection.classList.remove('hidden');
+            let details = [];
+            if (cr.tabSwitchCount > 0) details.push(`สลับแท็บ/ออกจากหน้าต่าง: <strong>${cr.tabSwitchCount}</strong> ครั้ง`);
+            if (cr.refreshCount > 0) details.push(`รีเฟรชหน้าเว็บ: <strong>${cr.refreshCount}</strong> ครั้ง`);
+            cheatSection.innerHTML = `
+                <div class="bg-red-50 border-2 border-red-200 rounded-2xl p-5 space-y-2">
+                    <h4 class="font-bold text-red-700 flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+                        บันทึกพฤติกรรมที่ต้องระวังระหว่างสอบ
+                    </h4>
+                    <div class="text-sm text-red-600 space-y-1">
+                        ${details.map(d => `<p class="flex items-center gap-2"><i class="fa-solid fa-circle text-[4px]"></i> ${d}</p>`).join('')}
+                    </div>
+                    <p class="text-xs text-red-400 mt-2">หมายเหตุ: ระบบบันทึกจำนวนครั้งที่นักเรียนออกจากหน้าต่างข้อสอบโดยอัตโนมัติ</p>
+                </div>`;
+        } else {
+            cheatSection.classList.add('hidden');
+            cheatSection.innerHTML = '';
+        }
+    }
+
     queueTypeset(document.getElementById('sec-exam-result'));
 }
 
@@ -2728,7 +2901,7 @@ window.onload = () => {
     switchReviewTab('17-2-tension');
     queueTypeset(document.body);
 
-    const activeSession = sessionStorage.getItem(EXAM_STATE_KEY);
+    const activeSession = localStorage.getItem(EXAM_STATE_KEY);
     if (activeSession) {
         try {
             const s = JSON.parse(activeSession);
@@ -2741,13 +2914,22 @@ window.onload = () => {
                 examIsActive = true;
                 document.getElementById('lbl-exam-user-info').innerHTML = `${s.studentInfo.name} (ม.6/${s.studentInfo.class} เลขที่ ${s.studentInfo.number})`;
                 renderExamLiveDOM();
+                attachAnswerSaveListeners();
+                // Restore previously saved answers
+                if (s.savedAnswers) {
+                    restoreExamAnswers(s.savedAnswers);
+                }
                 setupExamLocks();
                 showSection('exam-live');
                 startExamTimer();
+                // Count this as a refresh event
+                cheatLog.refreshCount++;
+                cheatLog.events.push({ type: 'refresh', time: Date.now() });
+                saveCheatLog();
             } else {
-                sessionStorage.removeItem(EXAM_STATE_KEY);
+                localStorage.removeItem(EXAM_STATE_KEY);
             }
-        } catch (e) { sessionStorage.removeItem(EXAM_STATE_KEY); }
+        } catch (e) { localStorage.removeItem(EXAM_STATE_KEY); }
     }
 
     const totalQuestions = QUESTION_TEMPLATES.length;

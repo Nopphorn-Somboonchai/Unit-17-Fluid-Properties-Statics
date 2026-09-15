@@ -1117,6 +1117,19 @@
                 </div>
             </div>
 
+            <!-- Cheat Warning Banner (floating) -->
+            <div id="cheat-warning-banner" class="hidden fixed top-20 right-4 z-[60] bg-red-600/95 backdrop-blur text-white px-5 py-3.5 rounded-xl shadow-2xl max-w-xs border border-red-400" style="transition: opacity 0.4s ease, transform 0.4s ease;">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-eye text-sm"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-wider text-red-200 mb-0.5">ระบบตรวจจับ</p>
+                        <p id="cheat-warning-text" class="text-sm font-medium"></p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Questions List -->
             <div id="exam-questions-container" class="space-y-6"></div>
 
@@ -1189,6 +1202,9 @@
                     class="text-center p-4 rounded-xl mb-8 border border-slate-200 bg-slate-50 text-sm">
                     <!-- Feedback message injected by JS -->
                 </div>
+
+                <!-- Cheat Report Section -->
+                <div id="exam-cheat-report" class="hidden mb-8"></div>
 
                 <!-- Detailed Table -->
                 <h4 class="font-bold text-slate-800 text-lg mb-4 flex items-center gap-2"><i
