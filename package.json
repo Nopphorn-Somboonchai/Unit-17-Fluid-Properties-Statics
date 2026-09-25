@@ -5,7 +5,7 @@
   "main": "app.js",
   "scripts": {
     "build": "tailwindcss -i input.css -o style.css --minify",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test_questions.js"
   },
   "repository": {
     "type": "git",

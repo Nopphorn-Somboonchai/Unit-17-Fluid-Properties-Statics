@@ -146,7 +146,7 @@ function addToHistory(uniqueKey) {
 function getActiveParamValues(params) {
     const values = [];
     for (const key in params) {
-        if (key !== 'r' && key !== 'offset' && !key.endsWith('_base') && typeof params[key] === 'number') {
+        if (key !== 'r' && key !== 'r_offset' && key !== 'offset' && !key.endsWith('_base') && !key.endsWith('_add') && typeof params[key] === 'number') {
             values.push(params[key]);
         }
     }
@@ -161,7 +161,7 @@ function hasDuplicateVariables(params) {
 
 function generateUniqueKey(templateId, params) {
     const vals = [];
-    const keys = Object.keys(params).filter(k => k !== 'r' && k !== 'offset' && !k.endsWith('_base'));
+    const keys = Object.keys(params).filter(k => k !== 'r' && k !== 'r_offset' && k !== 'offset' && !k.endsWith('_base') && !k.endsWith('_add'));
     keys.sort();
     keys.forEach(k => {
         if (typeof params[k] === 'number') {
@@ -1650,25 +1650,26 @@ const QUESTION_TEMPLATES = [
         id: '17_2_1_ring_tension', topic: '17.2.1', type: 'numeric_single',
         title: 'ความตึงผิวของห่วงโลหะวงกลมสัมผัส 2 ด้าน',
         inputs: [{ label: 'สัมประสิทธิ์ความตึงผิว \\( (\\text{N/m}) \\):' }],
-        text: (p) => `ดึงห่วงวงแหวนบางรัศมี \\( ${p.r_cm} \\text{ cm} \\) ขึ้นจากผิวของของเหลวชนิดหนึ่ง พบว่าต้องออกแรงดึงมากกว่าน้ำหนักห่วงทรานสวิสเป็นปริมาณ \\( ${p.r ? `(${p.f_base} + \\ ${p.r * 0.005})` : p.f} \\text{ N} \\) พอดีตอนที่ห่วงหลุดพ้นผิว จงหาค่าสัมประสิทธิ์ความตึงผิวของของเหลวนี้`,
+        text: (p) => `ดึงห่วงวงแหวนบางรัศมี \\( ${p.r_cm} \\text{ cm} \\) ขึ้นจากผิวของของเหลวชนิดหนึ่ง พบว่าต้องออกแรงดึงมากกว่าน้ำหนักห่วงทรานสวิสเป็นปริมาณ \\( ${p.f_add ? `(${p.f_base} + \\ ${p.f_add})` : p.f} \\text{ N} \\) พอดีตอนที่ห่วงหลุดพ้นผิว จงหาค่าสัมประสิทธิ์ความตึงผิวของของเหลวนี้`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
             const r_cm = seed ? getSeededRandomBase('17_2_1_ring_r', seed, 3.0, 20.0, 0.5) : 10.0;
             const f_base = seed ? getSeededRandomBase('17_2_1_ring_f', seed, 0.05, 0.30, 0.005) : 0.12;
-            const f = seed ? f_base + offset * 0.005 : 0.12;
+            const f_add = parseFloat((offset * 0.005).toFixed(4));
+            const f = seed ? parseFloat((f_base + f_add).toFixed(4)) : 0.12;
 
             const radius_m = r_cm / 100;
             const L_total = 2 * (2 * Math.PI * radius_m);
             const gamma = f / L_total;
 
             return {
-                params: { r_cm, f: parseFloat(f.toFixed(4)), f_base, r: offset },
+                params: { r_cm, f: parseFloat(f.toFixed(4)), f_base, f_add, r: offset },
                 answers: [`\\( ${formatScientificLaTeX(gamma, 3)} \\)`, gamma.toFixed(4), gamma.toFixed(3)],
                 answersRaw: [gamma],
                 explanation: () => `
           จากสูตรสัมประสิทธิ์ความตึงผิวของห่วงโลหะบาง (สัมผัสของเหลว 2 ด้าน ทั้งวงในและวงนอก):<br>
           \\( \\gamma = \\frac{F}{L} = \\frac{F}{2 \\cdot (2\\pi r)} = \\frac{F}{4\\pi r} \\)<br>
-          - แรงตึงผิว \\( F = ${offset ? `(${f_base.toFixed(2)} + ${(offset * 0.005).toFixed(3)}) = ` : ''}${f.toFixed(4)} \\text{ N} \\)<br>
+          - แรงตึงผิว \\( F = ${f_add ? `(${f_base} + ${f_add}) = ` : ''}${f.toFixed(4)} \\text{ N} \\)<br>
           - รัศมี \\( r = ${r_cm} \\text{ cm} = ${radius_m.toFixed(3)} \\text{ m} \\)<br>
           แทนค่าคำนวณ:<br>
           \\( \\gamma = \\frac{${f.toFixed(4)}}{4 \\cdot \\pi \\cdot ${radius_m.toFixed(3)}} \\approx ${gamma.toFixed(4)} \\text{ N/m} \\)
@@ -1808,11 +1809,12 @@ const QUESTION_TEMPLATES = [
         id: '17_3_1_pressure_depth', topic: '17.3.1', type: 'numeric_double',
         title: 'ความดันเกจและความดันสัมบูรณ์ใต้น้ำ',
         inputs: [{ label: '1. ความดันเกจ \\( (\\text{Pa}) \\):' }, { label: '2. ความดันสัมบูรณ์ \\( (\\text{Pa}) \\):' }],
-        text: (p) => `นักสำรวจเรือดำน้ำวัดค่าความลึกตรงจุดก้นน้ำทะเลลึกได้เป็นระยะทาง \\( ${p.r ? `(${p.h_base} + \\ ${p.r * 2})` : p.h} \\text{ m} \\) ถ้าน้ำทะเลความหนาแน่นเฉลี่ย \\( 1.02 \\times 10^3 \\text{ kg/m}^3 \\) จงคำนวณหา (1) ความดันเกจ และ (2) ความดันสัมบูรณ์ ณ ความลึกนี้ (กำหนดความดันบรรยากาศ \\( P_0 = 1.0 \\times 10^5 \\text{ Pa} \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
+        text: (p) => `นักสำรวจเรือดำน้ำวัดค่าความลึกตรงจุดก้นน้ำทะเลลึกได้เป็นระยะทาง \\( ${p.h_add ? `(${p.h_base} + \\ ${p.h_add})` : p.h} \\text{ m} \\) ถ้าน้ำทะเลความหนาแน่นเฉลี่ย \\( 1.02 \\times 10^3 \\text{ kg/m}^3 \\) จงคำนวณหา (1) ความดันเกจ และ (2) ความดันสัมบูรณ์ ณ ความลึกนี้ (กำหนดความดันบรรยากาศ \\( P_0 = 1.0 \\times 10^5 \\text{ Pa} \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
             const h_base = seed ? getSeededRandomBase('17_3_1_press_h', seed, 20, 120, 5) : 80;
-            const h = seed ? h_base + offset * 2 : 100;
+            const h_add = offset * 2;
+            const h = seed ? h_base + h_add : 100;
 
             const rho = 1020;
             const pg = rho * 10 * h;
@@ -1820,10 +1822,11 @@ const QUESTION_TEMPLATES = [
             const pAbs = p0 + pg;
 
             return {
-                params: { h, h_base, r: offset },
+                params: { h, h_base, h_add, r: offset },
                 answers: [`${pg.toExponential(2)}, ${pAbs.toExponential(2)}`, `${pg}, ${pAbs}`],
                 answersRaw: [pg, pAbs],
                 explanation: () => `
+          - ระดับความลึก: \\( h = ${h_add ? `(${h_base} + ${h_add}) = ` : ''}${h} \\text{ m} \\)<br>
           1. สูตรความดันเกจเนื่องจากระดับของเหลว: \\( P_g = \\rho g h \\)<br>
           \\( P_g = (1020 \\text{ kg/m}^3) \\cdot (10 \\text{ m/s}^2) \\cdot (${h} \\text{ m}) = ${pg.toLocaleString()} \\text{ Pa} \\) (หรือ \\( ${formatScientificLaTeX(pg, 2)} \\text{ Pa} \\))<br>
           2. สูตรความดันสัมบูรณ์สะสมรวม: \\( P = P_0 + P_g \\)<br>
@@ -1836,12 +1839,13 @@ const QUESTION_TEMPLATES = [
         id: '17_3_1_submarine_force', topic: '17.3.1', type: 'numeric_single',
         title: 'แรงดันสัมบูรณ์กระทำต่อฝาเรือดำน้ำ',
         inputs: [{ label: 'แรงดึงดันที่กระทำทั้งหมด \\( (\\text{N}) \\):' }],
-        text: (p) => `หน้าต่างทรงกลมสำหรับชมทัศนียภาพของเรือดำน้ำมีพื้นที่ผิว \\( ${p.area} \\text{ m}^2 \\) ดำลงไปลึกใต้ทะเล \\( ${p.r ? `(${p.h_base} + \\ ${p.r})` : p.h} \\text{ m} \\) จงหาแรงลัพธ์สัมบูรณ์ทั้งหมดที่กระทำบนฝาหน้าต่างนี้ภายนอก (กำหนดความหนาแน่นน้ำทะเล \\( 1.03 \\times 10^3 \\text{ kg/m}^3 \\), \\( P_0 = 1.0 \\times 10^5 \\text{ Pa} \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
+        text: (p) => `หน้าต่างทรงกลมสำหรับชมทัศนียภาพของเรือดำน้ำมีพื้นที่ผิว \\( ${p.area} \\text{ m}^2 \\) ดำลงไปลึกใต้ทะเล \\( ${p.h_add ? `(${p.h_base} + \\ ${p.h_add})` : p.h} \\text{ m} \\) จงหาแรงลัพธ์สัมบูรณ์ทั้งหมดที่กระทำบนฝาหน้าต่างนี้ภายนอก (กำหนดความหนาแน่นน้ำทะเล \\( 1.03 \\times 10^3 \\text{ kg/m}^3 \\), \\( P_0 = 1.0 \\times 10^5 \\text{ Pa} \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
             const area = seed ? getSeededRandomBase('17_3_1_sub_a', seed, 0.1, 1.0, 0.05) : 0.5;
             const h_base = seed ? getSeededRandomBase('17_3_1_sub_h', seed, 20, 100, 5) : 40;
-            const h = seed ? h_base + offset : 50;
+            const h_add = offset;
+            const h = seed ? h_base + h_add : 50;
 
             const rho = 1030;
             const pg = rho * 10 * h;
@@ -1849,10 +1853,11 @@ const QUESTION_TEMPLATES = [
             const force = pAbs * area;
 
             return {
-                params: { area: parseFloat(area.toFixed(2)), h, h_base, r: offset },
+                params: { area: parseFloat(area.toFixed(2)), h, h_base, h_add, r: offset },
                 answers: [`\\( ${formatScientificLaTeX(force, 2)} \\)`, force.toExponential(2), force.toFixed(0)],
                 answersRaw: [force],
                 explanation: () => `
+          - ระดับความลึก: \\( h = ${h_add ? `(${h_base} + ${h_add}) = ` : ''}${h} \\text{ m} \\)<br>
           1. คำนวณความดันสัมบูรณ์ ณ ความลึกทะเลก่อน:<br>
           \\( P = P_0 + \\rho g h = 10^5 + (1030 \\cdot 10 \\cdot ${h}) = ${pAbs.toLocaleString()} \\text{ Pa} \\)<br>
           2. หาแรงลัพธ์จากความสัมพันธ์ความดัน: \\( F = P \\cdot A \\)<br>
@@ -1890,7 +1895,7 @@ const QUESTION_TEMPLATES = [
         id: '17_3_2_piston_force', topic: '17.3.2', type: 'numeric_single',
         title: 'แรงกดขั้นต่ำในเครื่องอัดไฮดรอลิก',
         inputs: [{ label: 'แรงกดบนลูกสูบเล็ก \\( (\\text{N}) \\):' }],
-        text: (p) => `เครื่องอัดไฮดรอลิกท่อปิดลูกสูบเล็กมีรัศมี \\( ${p.r} \\text{ cm} \\) และลูกสูบยกฝั่งใหญ่มีรัศมี \\( ${p.R} \\text{ cm} \\) ถ้าต้องการชูยกรถยนต์บรรทุกหนัก \\( ${p.r_offset ? `(${p.m_base.toLocaleString()} + \\ ${(p.r_offset * 50).toLocaleString()})` : p.m.toLocaleString()} \\text{ kg} \\) ฝั่งลูกสูบใหญ่ จงหาแรงกดขั้นต่ำที่จำเป็นต้องมีที่ลูกสูบเล็กฝั่งนี้ (กำหนดให้ \\( g = 10 \\text{ m/s}^2 \\))`,
+        text: (p) => `เครื่องอัดไฮดรอลิกท่อปิดลูกสูบเล็กมีรัศมี \\( ${p.r} \\text{ cm} \\) และลูกสูบยกฝั่งใหญ่มีรัศมี \\( ${p.R} \\text{ cm} \\) ถ้าต้องการชูยกรถยนต์บรรทุกหนัก \\( ${p.m_add ? `(${p.m_base.toLocaleString()} + \\ ${p.m_add.toLocaleString()})` : p.m.toLocaleString()} \\text{ kg} \\) ฝั่งลูกสูบใหญ่ จงหาแรงกดขั้นต่ำที่จำเป็นต้องมีที่ลูกสูบเล็กฝั่งนี้ (กำหนดให้ \\( g = 10 \\text{ m/s}^2 \\))`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
             const r = seed ? getSeededRandomBase('17_3_2_press_r', seed, 1, 5, 1) : 3;
@@ -1898,19 +1903,22 @@ const QUESTION_TEMPLATES = [
             const M = seed ? M_list[Math.floor(getSeededRandomBase('17_3_2_press_M', seed, 0, M_list.length - 1, 1))] : 10;
             const R = r * M;
             const m_base = seed ? getSeededRandomBase('17_3_2_press_m', seed, 800, 2000, 100) : 1200;
-            const m = seed ? m_base + (offset % 10) * 50 : 1200;
+            const r_mod = seed ? (offset % 10) : 0;
+            const m_add = r_mod * 50;
+            const m = seed ? m_base + m_add : 1200;
 
             const forceLarge = m * 10;
             const forceSmall = Math.round(forceLarge / (M * M));
 
             return {
-                params: { r, R, m, m_base, r_offset: offset },
+                params: { r, R, m, m_base, m_add, r_offset: r_mod },
                 answers: [forceSmall.toFixed(0), forceSmall.toFixed(1), forceSmall.toFixed(2)],
                 answersRaw: [forceSmall],
                 explanation: () => `
           จากทฤษฎีการส่งผ่านความดันของพาสคัล (Pascal's Principle): \\( \\frac{f}{a} = \\frac{F}{A} \\)<br>
           เมื่อท่อสูบเป็นวงกลม: \\( a = \\pi r^2 \\) และ \\( A = \\pi R^2 \\)<br>
           จัดรูปสมการหาแรงกดขนาดเล็ก: \\( f = F \\cdot \\left(\\frac{r}{R}\\right)^2 = F \\cdot \\left(\\frac{1}{${M}}\\right)^2 \\)<br>
+          - มวลรถยนต์ฝั่งใหญ่: \\( m = ${m_add ? `(${m_base.toLocaleString()} + ${m_add.toLocaleString()}) = ` : ''}${m.toLocaleString()} \\text{ kg} \\)<br>
           - แรงต้านขนาดใหญ่: \\( F = mg = ${m.toLocaleString()} \\cdot 10 = ${forceLarge.toLocaleString()} \\text{ N} \\)<br>
           - อัตราส่วนรัศมี: \\( r/R = ${r}/${R} = 1/${M} \\)<br>
           แทนค่าคำนวณหาแรงกด:<br>
@@ -1923,7 +1931,7 @@ const QUESTION_TEMPLATES = [
         id: '17_3_2_large_diameter', topic: '17.3.2', type: 'numeric_single',
         title: 'หารัศมีของลูกสูบฝั่งยกวัตถุหนัก',
         inputs: [{ label: 'รัศมีลูกสูบฝั่งยกวัตถุ \\( (\\text{cm}) \\):' }],
-        text: (p) => `กระบอกสูบไฮดรอลิกผ่อนแรงมีลูกสูบกดรัศมีฝั่งเล็ก \\( ${p.r} \\text{ cm} \\) โดยออกแรงกดลงไป \\( ${p.f} \\text{ N} \\) แล้วส่งผ่านความดันสามารถยกรับน้ำหนักสิ่งของฝั่งใหญ่ได้สูงสุดหนัก \\( ${p.r_offset ? `(${p.F_base.toLocaleString()} + \\ ${p.F_add.toLocaleString()})` : p.F.toLocaleString()} \\text{ N} \\) จงหาขนาดของรัศมีของลูกสูบฝั่งใหญ่ตัวนี้`,
+        text: (p) => `กระบอกสูบไฮดรอลิกผ่อนแรงมีลูกสูบกดรัศมีฝั่งเล็ก \\( ${p.r} \\text{ cm} \\) โดยออกแรงกดลงไป \\( ${p.f} \\text{ N} \\) แล้วส่งผ่านความดันสามารถยกรับน้ำหนักสิ่งของฝั่งใหญ่ได้สูงสุดหนัก \\( ${p.F_add ? `(${p.F_base.toLocaleString()} + \\ ${p.F_add.toLocaleString()})` : p.F.toLocaleString()} \\text{ N} \\) จงหาขนาดของรัศมีของลูกสูบฝั่งใหญ่ตัวนี้`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
             const r = seed ? getSeededRandomBase('17_3_2_large_r', seed, 1, 6, 1) : 3;
@@ -1948,7 +1956,7 @@ const QUESTION_TEMPLATES = [
           \\( \\frac{f}{r^2} = \\frac{F}{R^2} \\Rightarrow R = r \\cdot \\sqrt{\\frac{F}{f}} \\)<br>
           - รัศมีสูบเล็ก \\( r = ${r} \\text{ cm} \\)<br>
           - แรงกดสูบเล็ก \\( f = ${f} \\text{ N} \\)<br>
-          - แรงต้านยกของฝั่งใหญ่ \\( F = ${F.toLocaleString()} \\text{ N} \\)<br>
+          - แรงต้านยกของฝั่งใหญ่ \\( F = ${F_add ? `(${F_base.toLocaleString()} + ${F_add.toLocaleString()}) = ` : ''}${F.toLocaleString()} \\text{ N} \\)<br>
           แทนค่าคำนวณ:<br>
           \\( R = ${r} \\cdot \\sqrt{\\frac{${F.toLocaleString()}}{${f}}} = ${r} \\cdot \\sqrt{${ratioSq}} = ${r} \\cdot ${M} = ${R} \\text{ cm} \\)
         `
@@ -1959,7 +1967,7 @@ const QUESTION_TEMPLATES = [
         id: '17_3_2_small_radius', topic: '17.3.2', type: 'numeric_single',
         title: 'หารัศมีของลูกสูบกดฝั่งเล็กในเครื่องอัดไฮดรอลิก',
         inputs: [{ label: 'รัศมีลูกสูบฝั่งเล็ก \\( (\\text{cm}) \\):' }],
-        text: (p) => `กระบอกสูบไฮดรอลิกมีลูกสูบยกฝั่งใหญ่รัศมี \\( ${p.R} \\text{ cm} \\) ต้องชูยกรถยนต์หนัก \\( ${p.r_offset ? `(${p.F_base.toLocaleString()} + \\ ${p.F_add.toLocaleString()})` : p.F.toLocaleString()} \\text{ N} \\) โดยออกแรงกดฝั่งเล็กเพียง \\( ${p.f} \\text{ N} \\) จงคำนวณหาขนาดของรัศมีของลูกสูบกดฝั่งเล็กตัวนี้`,
+        text: (p) => `กระบอกสูบไฮดรอลิกมีลูกสูบยกฝั่งใหญ่รัศมี \\( ${p.R} \\text{ cm} \\) ต้องชูยกรถยนต์หนัก \\( ${p.F_add ? `(${p.F_base.toLocaleString()} + \\ ${p.F_add.toLocaleString()})` : p.F.toLocaleString()} \\text{ N} \\) โดยออกแรงกดฝั่งเล็กเพียง \\( ${p.f} \\text{ N} \\) จงคำนวณหาขนาดของรัศมีของลูกสูบกดฝั่งเล็กตัวนี้`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
             const f = seed ? getSeededRandomBase('17_3_2_small_f', seed, 25, 150, 25) : 100;
@@ -1985,7 +1993,7 @@ const QUESTION_TEMPLATES = [
           \\( \\frac{f}{r^2} = \\frac{F}{R^2} \\Rightarrow r = \\frac{R}{\\sqrt{\\frac{F}{f}}} \\)<br>
           - รัศมีสูบใหญ่ \\( R = ${R} \\text{ cm} \\)<br>
           - แรงกดสูบเล็ก \\( f = ${f} \\text{ N} \\)<br>
-          - แรงต้านยกของฝั่งใหญ่ \\( F = ${F.toLocaleString()} \\text{ N} \\)<br>
+          - แรงต้านยกของฝั่งใหญ่ \\( F = ${F_add ? `(${F_base.toLocaleString()} + ${F_add.toLocaleString()}) = ` : ''}${F.toLocaleString()} \\text{ N} \\)<br>
           แทนค่าคำนวณ:<br>
           \\( r = \\frac{${R}}{\\sqrt{\\frac{${F.toLocaleString()}}{${f}}}} = \\frac{${R}}{\\sqrt{${ratioSq}}} = \\frac{${R}}{${M}} = ${r} \\text{ cm} \\)
         `
@@ -1996,7 +2004,7 @@ const QUESTION_TEMPLATES = [
         id: '17_3_2_piston_radius_from_mass', topic: '17.3.2', type: 'numeric_single',
         title: 'หารัศมีของลูกสูบใหญ่จากมวลรถยนต์ที่ยก',
         inputs: [{ label: 'รัศมีลูกสูบฝั่งใหญ่ \\( (\\text{cm}) \\):' }],
-        text: (p) => `แม่แรงไฮดรอลิกมีลูกสูบกดรัศมีฝั่งเล็ก \\( ${p.r} \\text{ cm} \\) ออกแรงกดลงไป \\( ${p.f} \\text{ N} \\) สามารถยกรับมวลรถยนต์ฝั่งใหญ่ได้หนัก \\( ${p.r_offset ? `(${p.m_base.toLocaleString()} + \\ ${p.m_add.toLocaleString()})` : p.m.toLocaleString()} \\text{ kg} \\) จงหารัศมีของลูกสูบฝั่งใหญ่ตัวนี้ (กำหนดให้ \\( g = 10 \\text{ m/s}^2 \\))`,
+        text: (p) => `แม่แรงไฮดรอลิกมีลูกสูบกดรัศมีฝั่งเล็ก \\( ${p.r} \\text{ cm} \\) ออกแรงกดลงไป \\( ${p.f} \\text{ N} \\) สามารถยกรับมวลรถยนต์ฝั่งใหญ่ได้หนัก \\( ${p.m_add ? `(${p.m_base.toLocaleString()} + \\ ${p.m_add.toLocaleString()})` : p.m.toLocaleString()} \\text{ kg} \\) จงหารัศมีของลูกสูบฝั่งใหญ่ตัวนี้ (กำหนดให้ \\( g = 10 \\text{ m/s}^2 \\))`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
             const r = seed ? getSeededRandomBase('17_3_2_mass_r', seed, 1, 6, 1) : 2;
@@ -2018,7 +2026,7 @@ const QUESTION_TEMPLATES = [
                 answers: [R.toFixed(0), R.toFixed(1), R.toFixed(2)],
                 answersRaw: [R],
                 explanation: () => `
-          1. หาน้ำหนักแรงต้านยกของฝั่งใหญ่ก่อน: \\( F = m \\cdot g = ${m.toLocaleString()} \\cdot 10 = ${F.toLocaleString()} \\text{ N} \\)<br>
+          1. หาน้ำหนักแรงต้านยกของฝั่งใหญ่ก่อน: \\( F = m \\cdot g = ${m_add ? `(${m_base.toLocaleString()} + ${m_add.toLocaleString()}) = ` : ''}${m.toLocaleString()} \\cdot 10 = ${F.toLocaleString()} \\text{ N} \\)<br>
           2. จากกฎพาสคัลคำนวณหารัศมีลูกสูบฝั่งใหญ่:<br>
           \\( \\frac{f}{r^2} = \\frac{F}{R^2} \\Rightarrow R = r \\cdot \\sqrt{\\frac{F}{f}} \\)<br>
           - รัศมีสูบเล็ก \\( r = ${r} \\text{ cm} \\)<br>
@@ -2033,7 +2041,7 @@ const QUESTION_TEMPLATES = [
         id: '17_3_2_hydraulic_ratio', topic: '17.3.2', type: 'numeric_single',
         title: 'หาอัตราส่วนรัศมีลูกสูบไฮดรอลิกผ่อนแรง',
         inputs: [{ label: 'อัตราส่วนรัศมีสูบใหญ่ต่อสูบเล็ก \\( (R/r) \\) (เท่า):' }],
-        text: (p) => `เครื่องอัดไฮดรอลิกผ่อนแรงออกแรงกดฝั่งเล็กเพียง \\( ${p.f} \\text{ N} \\) สามารถยกรถยนต์หนัก \\( ${p.r_offset ? `(${p.F_base.toLocaleString()} + \\ ${p.F_add.toLocaleString()})` : p.F.toLocaleString()} \\text{ N} \\) จงหาว่าขนาดรัศมีของลูกสูบฝั่งใหญ่เป็นกี่เท่าของรัศมีลูกสูบฝั่งเล็ก`,
+        text: (p) => `เครื่องอัดไฮดรอลิกผ่อนแรงออกแรงกดฝั่งเล็กเพียง \\( ${p.f} \\text{ N} \\) สามารถยกรถยนต์หนัก \\( ${p.F_add ? `(${p.F_base.toLocaleString()} + \\ ${p.F_add.toLocaleString()})` : p.F.toLocaleString()} \\text{ N} \\) จงหาว่าขนาดรัศมีของลูกสูบฝั่งใหญ่เป็นกี่เท่าของรัศมีลูกสูบฝั่งเล็ก`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
             const f = seed ? getSeededRandomBase('17_3_2_ratio_f', seed, 25, 150, 25) : 50;
@@ -2054,7 +2062,7 @@ const QUESTION_TEMPLATES = [
           จากกฎพาสคัลเปรียบเทียบรัศมีลูกสูบขยายพื้นที่:<br>
           \\( \\frac{f}{r^2} = \\frac{F}{R^2} \\Rightarrow \\left(\\frac{R}{r}\\right)^2 = \\frac{F}{f} \\Rightarrow \\frac{R}{r} = \\sqrt{\\frac{F}{f}} \\)<br>
           - แรงกดสูบเล็ก \\( f = ${f} \\text{ N} \\)<br>
-          - แรงต้านยกของฝั่งใหญ่ \\( F = ${F.toLocaleString()} \\text{ N} \\)<br>
+          - แรงต้านยกของฝั่งใหญ่ \\( F = ${F_add ? `(${F_base.toLocaleString()} + ${F_add.toLocaleString()}) = ` : ''}${F.toLocaleString()} \\text{ N} \\)<br>
           แทนค่าคำนวณหาอัตราส่วนรัศมี:<br>
           \\( \\frac{R}{r} = \\sqrt{\\frac{${F.toLocaleString()}}{${f}}} = \\sqrt{${ratioSq}} = ${M} \\text{ เท่า} \\)
         `
@@ -2090,22 +2098,26 @@ const QUESTION_TEMPLATES = [
         id: '17_3_3_submerged_ratio', topic: '17.3.3', type: 'numeric_single',
         title: 'เศษส่วนลอยน้ำจมน้ำของไม้สถิต',
         inputs: [{ label: 'เปอร์เซ็นต์ปริมาตรส่วนที่จมใต้ระดับผิวน้ำ (%):' }],
-        text: (p) => `ท่อนไม้เนื้อแน่นที่มีระดับความหนาแน่น \\( ${p.r ? `(${p.rho_w_base} + \\ ${p.r * 10})` : p.rho_w} \\text{ kg/m}^3 \\) นำไปลอยอย่างอิสระนิ่งในทะเลสาบน้ำจืด (ความหนาแน่นน้ำจืดเท่ากับ \\( 1000 \\text{ kg/m}^3 \\)) จงหาว่าปริมาตรของท่อนไม้ในส่วนที่จมใต้น้ำคิดเป็นร้อยละเท่าใดของปริมาตรรวมไม้ท่อนนี้`,
+        text: (p) => `ท่อนไม้เนื้อแน่นที่มีระดับความหนาแน่น \\( ${p.rho_w_add ? `(${p.rho_w_base} + \\ ${p.rho_w_add})` : p.rho_w} \\text{ kg/m}^3 \\) นำไปลอยอย่างอิสระนิ่งในทะเลสาบน้ำจืด (ความหนาแน่นน้ำจืดเท่ากับ \\( 1000 \\text{ kg/m}^3 \\)) จงหาว่าปริมาตรของท่อนไม้ในส่วนที่จมใต้น้ำคิดเป็นร้อยละเท่าใดของปริมาตรรวมไม้ท่อนนี้`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
+            const r_mod = seed ? (offset % 10) : 0;
+            const rho_w_add = r_mod * 10;
             const rho_w_base = seed ? getSeededRandomBase('17_3_3_sub_rho', seed, 400, 800, 20) : 600;
-            const rho_w = seed ? rho_w_base + (offset % 10) * 10 : 700;
+            const rho_w = seed ? rho_w_base + rho_w_add : 700;
 
             const fraction = Math.round((rho_w / 1000) * 100);
 
             return {
-                params: { rho_w, rho_w_base, r: offset },
+                params: { rho_w, rho_w_base, rho_w_add, r: r_mod },
                 answers: [fraction.toFixed(0), fraction.toFixed(1), fraction.toFixed(2)],
                 answersRaw: [fraction],
                 explanation: () => `
           จากเงื่อนไขสมดุลของเทหวัตถุจมลอยในน้ำ (ลอยตัวนิ่ง):<br>
           แรงลอยตัวพยุง เท่ากับ น้ำหนักท่อนไม้ทั้งหมด: \\( B = W \\)<br>
           \\( \\rho_{\\text{water}} \\cdot V_{\\text{sub}} \\cdot g = \\rho_{\\text{wood}} \\cdot V_{\\text{total}} \\cdot g \\)<br>
+          - ความหนาแน่นของท่อนไม้: \\( \\rho_{\\text{wood}} = ${rho_w_add ? `(${rho_w_base} + ${rho_w_add}) = ` : ''}${rho_w} \\text{ kg/m}^3 \\)<br>
+          - ความหนาแน่นน้ำจืด: \\( \\rho_{\\text{water}} = 1000 \\text{ kg/m}^3 \\)<br>
           หาเศษส่วนการจมใต้ผิวของเหลว:<br>
           \\( \\frac{V_{\\text{sub}}}{V_{\\text{total}}} = \\frac{\\rho_{\\text{wood}}}{\\rho_{\\text{water}}} = \\frac{${rho_w}}{1000} \\)<br>
           คิดเป็นเปอร์เซ็นต์ส่วนจมลงใต้น้ำ:<br>
@@ -2118,11 +2130,13 @@ const QUESTION_TEMPLATES = [
         id: '17_3_3_apparent_weight', topic: '17.3.3', type: 'numeric_single',
         title: 'น้ำหนักปรากฏก้อนหินเมื่อแช่อยู่ใต้น้ำ',
         inputs: [{ label: 'น้ำหนักปรากฏบนสปริง \\( (\\text{N}) \\):' }],
-        text: (p) => `ก้อนวัตถุแกนหินก้อนหนึ่งมีปริมาตรปริซึม \\( ${p.r ? `(${p.vol_L_base.toFixed(1)} + \\ ${(p.r * 0.5).toFixed(1)})` : p.vol_L.toFixed(1)} \\text{ L} \\) และมีความหนาแน่นเฉลี่ย \\( 2.8 \\times 10^3 \\text{ kg/m}^3 \\) แขวนติดตาชั่งสปริงอ่านแรงดึงยื่นลงไปแช่ในอ่างน้ำจนมิดตัว จงหาค่าน้ำหนักแรงดึงที่อ่านได้จากตราชั่งสปริงขวดนี้ (กำหนดให้น้ำความหนาแน่น \\( 1000 \\text{ kg/m}^3 \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
+        text: (p) => `ก้อนวัตถุแกนหินก้อนหนึ่งมีปริมาตรปริซึม \\( ${p.vol_add ? `(${p.vol_L_base.toFixed(1)} + \\ ${p.vol_add.toFixed(1)})` : p.vol_L.toFixed(1)} \\text{ L} \\) และมีความหนาแน่นเฉลี่ย \\( 2.8 \\times 10^3 \\text{ kg/m}^3 \\) แขวนติดตาชั่งสปริงอ่านแรงดึงยื่นลงไปแช่ในอ่างน้ำจนมิดตัว จงหาค่าน้ำหนักแรงดึงที่อ่านได้จากตราชั่งสปริงขวดนี้ (กำหนดให้น้ำความหนาแน่น \\( 1000 \\text{ kg/m}^3 \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
         generate: (seed) => {
             const offset = getOffsetFromR(seed);
+            const r_mod = seed ? (offset % 5) : 0;
+            const vol_add = parseFloat((r_mod * 0.5).toFixed(1));
             const vol_L_base = seed ? getSeededRandomBase('17_3_3_app_v', seed, 1.0, 5.0, 0.5) : 2.0;
-            const vol_L = seed ? parseFloat((vol_L_base + (offset % 5) * 0.5).toFixed(1)) : 3.0;
+            const vol_L = seed ? parseFloat((vol_L_base + vol_add).toFixed(1)) : 3.0;
 
             const vol_m3 = vol_L / 1000;
             const rho_stone = 2800;
@@ -2132,12 +2146,12 @@ const QUESTION_TEMPLATES = [
             const weight_apparent = Math.round(weight_air - buoyant);
 
             return {
-                params: { vol_L, vol_L_base, r: offset },
+                params: { vol_L, vol_L_base, vol_add, r: r_mod },
                 answers: [weight_apparent.toFixed(0), weight_apparent.toFixed(1), weight_apparent.toFixed(2)],
                 answersRaw: [weight_apparent],
                 explanation: () => `
-          1. แปลงหน่วยปริมาตรจากลิตร (L) เป็นลูกบาศก์เมตร (\\(\\text{m}^3\\)):<br>
-          \\( V = ${vol_L.toFixed(1)} \\text{ L} = \\frac{${vol_L.toFixed(1)}}{1000} \\text{ m}^3 = ${vol_m3.toFixed(4)} \\text{ m}^3 \\)<br>
+          1. คำนวณปริมาตรรวมของก้อนหินและแปลงเป็นลูกบาศก์เมตร (\\(\\text{m}^3\\)):<br>
+          \\( V = ${vol_add ? `(${vol_L_base.toFixed(1)} + ${vol_add.toFixed(1)}) = ` : ''}${vol_L.toFixed(1)} \\text{ L} = \\frac{${vol_L.toFixed(1)}}{1000} \\text{ m}^3 = ${vol_m3.toFixed(4)} \\text{ m}^3 \\)<br>
           2. หาน้ำหนักจริงในอากาศของก้อนหิน:<br>
           \\( W = m \\cdot g = (\\rho_{\\text{obj}} \\cdot V) \\cdot g = (2800 \\text{ kg/m}^3 \\cdot ${vol_m3.toFixed(4)} \\text{ m}^3) \\cdot 10 \\text{ m/s}^2 = ${weight_air.toFixed(1)} \\text{ N} \\)<br>
           3. หาแรงลอยตัวพยุง (ตามหลักของอาร์คิมีดีส):<br>
@@ -2180,21 +2194,22 @@ for (let i = 1; i <= 10; i++) {
             id: `17_3_1_gen_pressure_${i}`, topic: '17.3.1', type: 'numeric_single',
             title: `คำนวณความดันเกจ ณ จุดลึกใต้แม่น้ำ (ชุดที่ ${i})`,
             inputs: [{ label: 'ความดันเกจ \\( (\\text{Pa}) \\):' }],
-            text: (p) => `แทงค์คอนกรีตเก็บน้ำขนาดใหญ่สำหรับโรงงานผลิตน้ำประปามีน้ำบรรจุอยู่สูงกักเก็บ \\( ${p.r ? `(${p.h_base} + \\ ${p.r})` : p.h} \\text{ m} \\) จงหาความดันเกจที่ก้นบ่อเก็บ (กำหนดให้ความหนาแน่นน้ำน้ำจืด \\( 1000 \\text{ kg/m}^3 \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
+            text: (p) => `แทงค์คอนกรีตเก็บน้ำขนาดใหญ่สำหรับโรงงานผลิตน้ำประปามีน้ำบรรจุอยู่สูงกักเก็บ \\( ${p.h_add ? `(${p.h_base} + \\ ${p.h_add})` : p.h} \\text{ m} \\) จงหาความดันเกจที่ก้นบ่อเก็บ (กำหนดให้ความหนาแน่นน้ำน้ำจืด \\( 1000 \\text{ kg/m}^3 \\) และ \\( g = 10 \\text{ m/s}^2 \\))`,
             generate: (seed) => {
                 const offset = getOffsetFromR(seed);
                 const h_base = seed ? getSeededRandomBase(`17_3_1_gen_h_${i}`, seed, 3, 30, 1) : 10;
-                const h = seed ? h_base + offset : 12;
+                const h_add = offset;
+                const h = seed ? h_base + h_add : 12;
 
                 const pg = 1000 * 10 * h;
 
                 return {
-                    params: { h, h_base, r: offset },
+                    params: { h, h_base, h_add, r: offset },
                     answers: [`\\( ${formatScientificLaTeX(pg, 2)} \\)`, pg.toString(), pg.toExponential(2)],
                     answersRaw: [pg],
                     explanation: () => `
             คำนวณความดันเกจจากสูตรตรงตัว: \\( P_g = \\rho g h \\)<br>
-            - ความลึกน้ำ \\( h = ${h} \\text{ m} \\)<br>
+            - ความลึกน้ำ \\( h = ${h_add ? `(${h_base} + ${h_add}) = ` : ''}${h} \\text{ m} \\)<br>
             แทนค่าในสูตร:<br>
             \\( P_g = 1000 \\cdot 10 \\cdot ${h} = ${pg.toLocaleString()} \\text{ Pa} \\)
           `
@@ -2206,7 +2221,7 @@ for (let i = 1; i <= 10; i++) {
             id: `17_3_2_gen_hydraulic_${i}`, topic: '17.3.2', type: 'numeric_single',
             title: `การขยายแรงอัดลูกสูบผ่อนแรง (ชุดที่ ${i})`,
             inputs: [{ label: 'แรงกดฝั่งลูกสูบเล็ก \\( (\\text{N}) \\):' }],
-            text: (p) => `แม่แรงไฮดรอลิกมีสัดส่วนของพื้นที่หน้าตัดลูกสูบเล็กต่อสูบใหญ่เป็นอัตราส่วน \\( 1 : ${p.ratio} \\) หากยกรถยนต์หนัก \\( ${p.r ? `(${p.F_base.toLocaleString()} + \\ ${(p.r * p.F_step).toLocaleString()})` : p.F.toLocaleString()} \\text{ N} \\) จงหาขนาดแรงกดบนฝั่งลูกสูบเล็ก`,
+            text: (p) => `แม่แรงไฮดรอลิกมีสัดส่วนของพื้นที่หน้าตัดลูกสูบเล็กต่อสูบใหญ่เป็นอัตราส่วน \\( 1 : ${p.ratio} \\) หากยกรถยนต์หนัก \\( ${p.F_add ? `(${p.F_base.toLocaleString()} + \\ ${p.F_add.toLocaleString()})` : p.F.toLocaleString()} \\text{ N} \\) จงหาขนาดแรงกดบนฝั่งลูกสูบเล็ก`,
             generate: (seed) => {
                 const offset = getOffsetFromR(seed);
                 const ratio = seed ? getSeededRandomBase(`17_3_2_gen_r_${i}`, seed, 20, 150, 10) : 100;
@@ -2214,16 +2229,16 @@ for (let i = 1; i <= 10; i++) {
                 const f = seed ? f_base + (offset % 5) * 10 : 120;
                 const F = f * ratio;
                 const F_base = f_base * ratio;
-                const F_step = 10 * ratio;
+                const F_add = F - F_base;
 
                 return {
-                    params: { ratio, F, F_base, F_step, r: offset % 5 },
+                    params: { ratio, F, F_base, F_add, r: offset % 5 },
                     answers: [f.toFixed(0), f.toFixed(1), f.toFixed(2)],
                     answersRaw: [f],
                     explanation: () => `
             จากอัตราการส่งทอดความดัน: \\( \\frac{f}{a} = \\frac{F}{A} \\Rightarrow f = F \\cdot \\left( \\frac{a}{A} \\right) \\)<br>
             - สัดส่วนพื้นที่หน้าตัด \\( a/A = 1/${ratio} \\)<br>
-            - แรงดึงฝั่งยก \\( F = ${F.toLocaleString()} \\text{ N} \\)<br>
+            - แรงดึงฝั่งยก \\( F = ${F_add ? `(${F_base.toLocaleString()} + ${F_add.toLocaleString()}) = ` : ''}${F.toLocaleString()} \\text{ N} \\)<br>
             แทนค่าในสูตร:<br>
             \\( f = \\frac{${F.toLocaleString()}}{${ratio}} = ${f} \\text{ N} \\)
           `
