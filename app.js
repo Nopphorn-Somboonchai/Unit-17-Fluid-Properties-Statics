@@ -2426,6 +2426,7 @@ function startExamProcess() {
     // Reset cheat log for new exam session
     cheatLog = { tabSwitchCount: 0, refreshCount: 0, events: [], sessionId: examSeed };
     saveCheatLog();
+    dismissCheatWarning();
 
     // 4 Subtopics for calculation (Numeric Input): 17.2.1, 17.3.1, 17.3.2, 17.3.3
     const numericSubtopics = ['17.2.1', '17.3.1', '17.3.2', '17.3.3'];
@@ -2586,14 +2587,41 @@ function showCheatWarning(msg) {
     if (!banner || !text) return;
     text.innerText = msg;
     banner.classList.remove('hidden');
-    banner.style.opacity = '1';
-    banner.style.transform = 'translateX(0)';
+
+    if (!banner.style) banner.style = {};
+    requestAnimationFrame(() => {
+        banner.style.opacity = '1';
+        banner.style.transform = 'translateX(0)';
+    });
+
+    if (banner.classList && banner.classList.remove) {
+        banner.classList.remove('cheat-shake');
+        void banner.offsetWidth; // trigger reflow
+        banner.classList.add('cheat-shake');
+    }
+
     if (cheatWarningTimeout) clearTimeout(cheatWarningTimeout);
     cheatWarningTimeout = setTimeout(() => {
-        banner.style.opacity = '0';
-        banner.style.transform = 'translateX(100%)';
-        setTimeout(() => banner.classList.add('hidden'), 400);
-    }, 3500);
+        dismissCheatWarning();
+    }, 4500);
+}
+
+function dismissCheatWarning() {
+    const banner = document.getElementById('cheat-warning-banner');
+    if (!banner) return;
+    if (cheatWarningTimeout) {
+        clearTimeout(cheatWarningTimeout);
+        cheatWarningTimeout = null;
+    }
+    if (!banner.style) banner.style = {};
+    banner.style.opacity = '0';
+    banner.style.transform = 'translateX(110%)';
+    setTimeout(() => {
+        if (banner.style.opacity === '0' && banner.classList && banner.classList.add) {
+            banner.classList.add('hidden');
+            banner.classList.remove('cheat-shake');
+        }
+    }, 400);
 }
 
 // --- Save Exam Answers to State ---
@@ -2743,6 +2771,7 @@ function executeSubmitExam() {
 
 function submitExam(timeExpired = false) {
     if (examSubmissionInProgress) return;
+    dismissCheatWarning();
     examSubmissionInProgress = true;
     examIsActive = false;
     clearInterval(examTimerInterval);
